@@ -105,10 +105,8 @@ export default function LoginPage() {
         </div>
 
         {/* Footer */}
-        <div className="relative z-10 flex items-center gap-4 text-white/40 text-sm">
-          <span>© 2026 ACIAV Saúde</span>
-          <span>·</span>
-          <span>Todos os direitos reservados</span>
+        <div className="relative z-10 text-white/40 text-xs">
+          © 2026 ACIAV Saúde — Todos os direitos reservados. Feito com ❤️ pela Agência ArtDesign
         </div>
       </div>
 

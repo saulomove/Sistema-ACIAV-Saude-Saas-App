@@ -141,7 +141,7 @@ export default function LandingPage() {
 
       {/* Footer */}
       <footer className="bg-slate-900 text-white/50 py-8 px-6 text-center text-sm">
-        <p>© 2026 ACIAV Saúde — Plataforma SaaS Multi-tenant de Saúde Corporativa</p>
+        <p>© 2026 ACIAV Saúde — Todos os direitos reservados. Feito com ❤️ pela Agência ArtDesign</p>
       </footer>
     </div>
   );
