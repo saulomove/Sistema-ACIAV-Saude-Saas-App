@@ -7,7 +7,7 @@ export async function POST(req: NextRequest) {
 
   response.cookies.set('aciav_token', token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
+    secure: false, // mudar para true após configurar HTTPS
     sameSite: 'lax',
     maxAge: 60 * 60 * 24 * 7, // 7 dias
     path: '/',
@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
 
   response.cookies.set('aciav_role', role, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
+    secure: false, // mudar para true após configurar HTTPS
     sameSite: 'lax',
     maxAge: 60 * 60 * 24 * 7,
     path: '/',
