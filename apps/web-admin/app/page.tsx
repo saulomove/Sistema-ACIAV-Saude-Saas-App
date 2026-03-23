@@ -24,11 +24,8 @@ export default function LandingPage() {
       {/* Navbar */}
       <nav className="sticky top-0 z-50 bg-white/90 backdrop-blur border-b border-gray-100 shadow-sm">
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 bg-primary rounded-xl flex items-center justify-center shadow-sm">
-              <span className="text-white font-black text-base">A</span>
-            </div>
-            <span className="text-xl font-black text-slate-800 tracking-tight">ACIAV Saúde</span>
+          <div className="w-36 h-9 relative">
+            <Image src="/logo-aciav-saude.png" alt="ACIAV Saúde" fill className="object-contain object-left" priority />
           </div>
           <Link
             href="/login"
