@@ -114,3 +114,29 @@ model Reward {
 
   provider Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
 }
+
+model AuthUser {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  role         String   // 'super_admin' | 'admin_unit' | 'rh' | 'provider' | 'patient'
+  unitId       String?
+  companyId    String?
+  providerId   String?
+  userId       String?
+  status       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  sessions Session[]
+}
+
+model Session {
+  id         String   @id @default(uuid())
+  authUserId String
+  token      String   @unique
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+
+  authUser AuthUser @relation(fields: [authUserId], references: [id], onDelete: Cascade)
+}
