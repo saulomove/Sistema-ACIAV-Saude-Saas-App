@@ -1,0 +1,116 @@
+// packages/database/prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Unit {
+  id        String   @id @default(uuid())
+  name      String
+  subdomain String   @unique
+  settings  String?  // JSON string
+  status    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  companies Company[]
+  users     User[]
+  providers Provider[]
+}
+
+model Company {
+  id            String   @id @default(uuid())
+  unitId        String
+  corporateName String
+  cnpj          String   @unique
+  adminEmail    String
+  status        Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  unit  Unit   @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  users User[]
+}
+
+model User {
+  id            String   @id @default(uuid())
+  companyId     String?
+  unitId        String
+  fullName      String
+  cpf           String   @unique
+  type          String   // 'titular' or 'dependente'
+  parentId      String?
+  pointsBalance Int      @default(0)
+  status        Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  unit         Unit           @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  company      Company?       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  parent       User?          @relation("UserToDependents", fields: [parentId], references: [id])
+  dependents   User[]         @relation("UserToDependents")
+  transactions Transaction[]
+}
+
+model Provider {
+  id           String   @id @default(uuid())
+  unitId       String
+  name         String
+  category     String
+  address      String?  // JSON string
+  rankingScore Float    @default(0.0)
+  bio          String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  unit         Unit          @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  services     Service[]
+  transactions Transaction[]
+  rewards      Reward[]
+}
+
+model Service {
+  id              String   @id @default(uuid())
+  providerId      String
+  description     String
+  originalPrice   Decimal  @default(0.0)
+  discountedPrice Decimal  @default(0.0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  provider     Provider      @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  transactions Transaction[]
+}
+
+model Transaction {
+  id              String   @id @default(uuid())
+  userId          String
+  providerId      String
+  serviceId       String
+  amountSaved     Decimal  @default(0.0)
+  confirmedByUser Boolean  @default(false)
+  rating          Int?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  service  Service  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+}
+
+model Reward {
+  id             String   @id @default(uuid())
+  providerId     String
+  name           String
+  pointsRequired Int
+  stock          Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  provider Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+}
