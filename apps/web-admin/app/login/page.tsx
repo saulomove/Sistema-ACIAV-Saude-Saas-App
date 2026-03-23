@@ -24,29 +24,35 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
+      console.log('[LOGIN] Iniciando login...');
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
       });
 
+      console.log('[LOGIN] Status da API:', res.status);
       const data = await res.json();
+      console.log('[LOGIN] Resposta da API:', data);
 
       if (!res.ok) {
         setError(data.message || 'E-mail ou senha incorretos.');
         return;
       }
 
-      // Salvar token em cookie httpOnly via rota interna do Next.js
-      await fetch('/internal/set-cookie', {
+      console.log('[LOGIN] Salvando cookie...');
+      const cookieRes = await fetch('/internal/set-cookie', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token: data.token, role: data.user.role }),
       });
+      console.log('[LOGIN] Cookie status:', cookieRes.status);
 
       const redirect = ROLE_REDIRECT[data.user.role] || '/';
+      console.log('[LOGIN] Redirecionando para:', redirect);
       router.push(redirect);
-    } catch {
+    } catch (err) {
+      console.error('[LOGIN] Erro:', err);
       setError('Erro ao conectar com o servidor. Tente novamente.');
     } finally {
       setLoading(false);
