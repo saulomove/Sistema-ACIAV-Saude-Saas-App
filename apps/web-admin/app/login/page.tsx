@@ -4,8 +4,8 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 const ROLE_REDIRECT: Record<string, string> = {
-  super_admin: '/',
-  admin_unit: '/',
+  super_admin: '/dashboard',
+  admin_unit: '/dashboard',
   rh: '/portal-rh',
   provider: '/portal-credenciado',
   patient: '/portal-paciente',

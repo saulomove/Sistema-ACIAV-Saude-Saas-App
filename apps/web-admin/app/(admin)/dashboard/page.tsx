@@ -1,6 +1,6 @@
-import { getSessionUser, serverFetch } from '../../lib/server-api';
-import DashboardClient from './DashboardClient';
-import SuperAdminDashboard from './SuperAdminDashboard';
+import { getSessionUser, serverFetch } from '../../../lib/server-api';
+import DashboardClient from '../DashboardClient';
+import SuperAdminDashboard from '../SuperAdminDashboard';
 
 export default async function Dashboard() {
   const user = await getSessionUser();
