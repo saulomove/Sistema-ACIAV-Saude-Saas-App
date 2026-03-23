@@ -2,8 +2,11 @@ import {
   Controller,
   Post,
   Get,
+  Patch,
   Body,
   Req,
+  Param,
+  Query,
   UseGuards,
   HttpCode,
   HttpStatus,
@@ -33,5 +36,30 @@ export class AuthController {
   @UseGuards(AuthGuard('jwt'))
   async me(@Req() req: any) {
     return this.authService.me(req.user.sub);
+  }
+
+  @Get('admin-users')
+  @UseGuards(AuthGuard('jwt'))
+  listAdminUsers(@Query('role') role?: string, @Query('unitId') unitId?: string) {
+    return this.authService.listAdminUsers({ role, unitId });
+  }
+
+  @Post('admin-users')
+  @UseGuards(AuthGuard('jwt'))
+  createAdminUser(@Body() body: {
+    email: string;
+    password: string;
+    role: string;
+    unitId?: string;
+    companyId?: string;
+    providerId?: string;
+  }) {
+    return this.authService.createAdminUser(body);
+  }
+
+  @Patch('admin-users/:id/status')
+  @UseGuards(AuthGuard('jwt'))
+  toggleStatus(@Param('id') id: string, @Body() body: { status: boolean }) {
+    return this.authService.toggleAdminUserStatus(id, body.status);
   }
 }

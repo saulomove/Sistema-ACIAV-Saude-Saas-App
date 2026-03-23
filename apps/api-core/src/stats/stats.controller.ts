@@ -8,7 +8,12 @@ export class StatsController {
   constructor(private statsService: StatsService) {}
 
   @Get('dashboard')
-  getDashboard(@Query('unitId') unitId: string) {
+  getDashboard(@Query('unitId') unitId?: string) {
     return this.statsService.getDashboardStats(unitId);
+  }
+
+  @Get('global')
+  getGlobal() {
+    return this.statsService.getGlobalStats();
   }
 }

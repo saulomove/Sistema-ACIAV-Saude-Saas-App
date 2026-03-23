@@ -61,6 +61,44 @@ export class AuthService {
     return { message: 'Logout realizado com sucesso.' };
   }
 
+  async listAdminUsers(filters: { role?: string; unitId?: string }) {
+    return this.prisma.authUser.findMany({
+      where: {
+        ...(filters.role && { role: filters.role }),
+        ...(filters.unitId && { unitId: filters.unitId }),
+        role: { not: 'patient' },
+      },
+      select: { id: true, email: true, role: true, unitId: true, companyId: true, providerId: true, status: true, createdAt: true },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async createAdminUser(data: {
+    email: string;
+    password: string;
+    role: string;
+    unitId?: string;
+    companyId?: string;
+    providerId?: string;
+  }) {
+    const existing = await this.prisma.authUser.findUnique({ where: { email: data.email } });
+    if (existing) throw new Error('E-mail já cadastrado no sistema.');
+
+    const passwordHash = await bcrypt.hash(data.password, 10);
+    return this.prisma.authUser.create({
+      data: { email: data.email, passwordHash, role: data.role, unitId: data.unitId, companyId: data.companyId, providerId: data.providerId },
+      select: { id: true, email: true, role: true, unitId: true, status: true, createdAt: true },
+    });
+  }
+
+  async toggleAdminUserStatus(id: string, status: boolean) {
+    return this.prisma.authUser.update({
+      where: { id },
+      data: { status },
+      select: { id: true, email: true, role: true, status: true },
+    });
+  }
+
   async me(authUserId: string) {
     const authUser = await this.prisma.authUser.findUnique({
       where: { id: authUserId },
