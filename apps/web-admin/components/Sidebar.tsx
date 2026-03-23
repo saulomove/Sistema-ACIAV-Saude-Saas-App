@@ -1,13 +1,19 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Users, Building, Stethoscope, FileText, Settings, Award } from 'lucide-react';
+import { usePathname, useRouter } from 'next/navigation';
+import { LayoutDashboard, Users, Building, Stethoscope, FileText, Settings, Award, LogOut } from 'lucide-react';
 import Image from 'next/image';
 import clsx from 'clsx';
 
 export default function Sidebar() {
     const pathname = usePathname();
+    const router = useRouter();
+
+    async function handleLogout() {
+        await fetch('/internal/logout', { method: 'POST' });
+        router.push('/login');
+    }
 
     const menuItems = [
         { name: 'Dashboard', icon: LayoutDashboard, href: '/' },
@@ -58,7 +64,7 @@ export default function Sidebar() {
             </nav>
 
             {/* Footer / User Profile */}
-            <div className="p-4 border-t border-gray-100 bg-slate-50/50">
+            <div className="p-4 border-t border-gray-100 bg-slate-50/50 space-y-3">
                 <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-lg shadow-sm">
                         SM
@@ -68,6 +74,13 @@ export default function Sidebar() {
                         <p className="text-xs text-slate-500">Super Admin</p>
                     </div>
                 </div>
+                <button
+                    onClick={handleLogout}
+                    className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-slate-500 hover:bg-red-50 hover:text-red-600 transition-colors text-sm font-medium"
+                >
+                    <LogOut size={16} />
+                    Sair
+                </button>
             </div>
         </aside>
     );
