@@ -16,4 +16,9 @@ export class StatsController {
   getGlobal() {
     return this.statsService.getGlobalStats();
   }
+
+  @Get('company')
+  getCompany(@Query('companyId') companyId: string) {
+    return this.statsService.getCompanyStats(companyId);
+  }
 }

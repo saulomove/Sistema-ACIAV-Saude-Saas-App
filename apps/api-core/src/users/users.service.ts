@@ -67,4 +67,24 @@ export class UsersService {
   async remove(id: string) {
     return this.prisma.user.update({ where: { id }, data: { status: false } });
   }
+
+  async importBatch(users: Array<{ unitId: string; companyId: string; fullName: string; cpf: string; type: string }>) {
+    const results = { created: 0, skipped: 0, errors: [] as string[] };
+
+    for (const u of users) {
+      try {
+        const existing = await this.prisma.user.findUnique({ where: { cpf: u.cpf } });
+        if (existing) {
+          results.skipped++;
+          continue;
+        }
+        await this.prisma.user.create({ data: { ...u, type: u.type || 'titular' } });
+        results.created++;
+      } catch {
+        results.errors.push(`CPF ${u.cpf}: erro ao importar`);
+      }
+    }
+
+    return results;
+  }
 }

@@ -66,6 +66,42 @@ export class StatsService {
     };
   }
 
+  async getCompanyStats(companyId: string) {
+    const [totalColaboradores, totalDependentes, totalTransacoes, totalSaved] = await Promise.all([
+      this.prisma.user.count({ where: { companyId, type: 'titular', status: true } }),
+      this.prisma.user.count({ where: { companyId, type: 'dependente', status: true } }),
+      this.prisma.transaction.count({ where: { user: { companyId } } }),
+      this.prisma.transaction.aggregate({
+        where: { user: { companyId } },
+        _sum: { amountSaved: true },
+      }),
+    ]);
+
+    const economiaTotal = Number(totalSaved._sum.amountSaved || 0);
+    const ultimosColaboradores = await this.prisma.user.findMany({
+      where: { companyId, type: 'titular' },
+      include: { _count: { select: { dependents: true } } },
+      orderBy: { createdAt: 'desc' },
+      take: 5,
+    });
+
+    return {
+      totalColaboradores,
+      totalDependentes,
+      totalVidas: totalColaboradores + totalDependentes,
+      totalTransacoes,
+      economiaTotal,
+      ultimosColaboradores: ultimosColaboradores.map((u) => ({
+        id: u.id,
+        fullName: u.fullName,
+        cpf: u.cpf,
+        status: u.status,
+        dependentes: u._count.dependents,
+        createdAt: u.createdAt,
+      })),
+    };
+  }
+
   private async getChartData(unitId?: string) {
     const months = [];
     const now = new Date();

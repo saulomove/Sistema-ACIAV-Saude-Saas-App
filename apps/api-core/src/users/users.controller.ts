@@ -22,6 +22,11 @@ export class UsersController {
     return this.usersService.validateUserByCpf(cpf, unitId);
   }
 
+  @Post('import')
+  importBatch(@Body() body: { users: Array<{ unitId: string; companyId: string; fullName: string; cpf: string; type: string }> }) {
+    return this.usersService.importBatch(body.users);
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.usersService.findOne(id);
