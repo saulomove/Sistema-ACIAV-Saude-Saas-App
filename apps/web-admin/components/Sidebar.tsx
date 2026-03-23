@@ -15,7 +15,7 @@ function getMenuItems(role: string): MenuItem[] {
   switch (role) {
     case 'super_admin':
       return [
-        { name: 'Dashboard Global', icon: LayoutDashboard, href: '/' },
+        { name: 'Dashboard Global', icon: LayoutDashboard, href: '/dashboard' },
         { name: 'Unidades', icon: Globe, href: '/unidades' },
         { name: 'Usuários Admin', icon: ShieldCheck, href: '/admin-users' },
         { name: 'Faturamento', icon: DollarSign, href: '/faturamento' },
@@ -23,7 +23,7 @@ function getMenuItems(role: string): MenuItem[] {
       ];
     case 'admin_unit':
       return [
-        { name: 'Dashboard', icon: LayoutDashboard, href: '/' },
+        { name: 'Dashboard', icon: LayoutDashboard, href: '/dashboard' },
         { name: 'Beneficiários', icon: Users, href: '/beneficiarios' },
         { name: 'Empresas (RH)', icon: Building, href: '/empresas' },
         { name: 'Credenciados', icon: Stethoscope, href: '/credenciados' },
@@ -33,7 +33,7 @@ function getMenuItems(role: string): MenuItem[] {
       ];
     default:
       return [
-        { name: 'Dashboard', icon: LayoutDashboard, href: '/' },
+        { name: 'Dashboard', icon: LayoutDashboard, href: '/dashboard' },
         { name: 'Beneficiários', icon: FileText, href: '/beneficiarios' },
         { name: 'Empresas (RH)', icon: Building, href: '/empresas' },
         { name: 'Credenciados', icon: Stethoscope, href: '/credenciados' },
