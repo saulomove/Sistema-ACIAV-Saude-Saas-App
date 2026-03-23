@@ -4,7 +4,7 @@ export default function PremiosPage() {
     const brindes = [
         { id: 1, name: 'Squeeze Personalizado', provider: 'ACIAV Videira', points: 300, stock: 45, image: '🥤' },
         { id: 2, name: 'Limpeza de Pele', provider: 'Clínica Estética Bella', points: 1200, stock: 5, image: '💆‍♀️' },
-        { id: 3, name: 'Desconto 20% em Suplementos', provider: 'Farmácia Preço Popular', points: 500, stock: unlimited => 'Ilimitado', image: '💊' },
+        { id: 3, name: 'Desconto 20% em Suplementos', provider: 'Farmácia Preço Popular', points: 500, stock: 999, image: '💊' },
     ];
 
     return (
