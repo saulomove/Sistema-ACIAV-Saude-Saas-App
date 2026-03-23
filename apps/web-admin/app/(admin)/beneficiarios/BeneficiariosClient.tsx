@@ -1,41 +1,134 @@
 'use client';
 
-import { useState } from 'react';
-import { Users, Plus, Search, MoreVertical, CreditCard, ActivitySquare } from 'lucide-react';
+import { useState, useTransition } from 'react';
+import { useRouter } from 'next/navigation';
+import { Users, Plus, Search, Pencil, Trash2, CreditCard, ActivitySquare, Loader2 } from 'lucide-react';
+import Modal from '../../../components/Modal';
+import { api } from '../../../lib/api-client';
 
+interface Company { id: string; corporateName: string; }
 interface User {
   id: string;
   fullName: string;
   cpf: string;
   type: string;
   status: boolean;
+  parentId?: string | null;
   company?: { corporateName: string } | null;
 }
 
-export default function BeneficiariosClient({ users }: { users: unknown[] }) {
+const EMPTY_FORM = { fullName: '', cpf: '', type: 'titular', companyId: '', parentId: '' };
+
+export default function BeneficiariosClient({
+  users,
+  companies,
+  unitId,
+}: {
+  users: unknown[];
+  companies: unknown[];
+  unitId: string;
+}) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('todos');
   const [statusFilter, setStatusFilter] = useState('ativo');
 
-  const lista = (users as User[]).filter((u) => {
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [form, setForm] = useState(EMPTY_FORM);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  const companyList = companies as Company[];
+  const userList = users as User[];
+  const titulares = userList.filter((u) => u.type === 'titular' && u.status);
+
+  const lista = userList.filter((u) => {
     const matchSearch =
       !search ||
       u.fullName.toLowerCase().includes(search.toLowerCase()) ||
       u.cpf.includes(search) ||
       (u.company?.corporateName ?? '').toLowerCase().includes(search.toLowerCase());
-
     const matchType =
       typeFilter === 'todos' ||
       (typeFilter === 'titular' && u.type === 'titular') ||
       (typeFilter === 'dependente' && u.type === 'dependente');
-
     const matchStatus =
       statusFilter === 'todos' ||
       (statusFilter === 'ativo' && u.status) ||
       (statusFilter === 'inativo' && !u.status);
-
     return matchSearch && matchType && matchStatus;
   });
+
+  function openCreate() {
+    setEditingId(null);
+    setForm(EMPTY_FORM);
+    setError('');
+    setModalOpen(true);
+  }
+
+  function openEdit(u: User) {
+    setEditingId(u.id);
+    setForm({
+      fullName: u.fullName,
+      cpf: u.cpf,
+      type: u.type,
+      companyId: '',
+      parentId: u.parentId ?? '',
+    });
+    setError('');
+    setModalOpen(true);
+  }
+
+  async function handleSave() {
+    if (!form.fullName.trim() || !form.cpf.trim()) {
+      setError('Nome e CPF são obrigatórios.');
+      return;
+    }
+    setSaving(true);
+    setError('');
+    try {
+      if (editingId) {
+        await api.put(`/users/${editingId}`, { fullName: form.fullName });
+      } else {
+        await api.post('/users', {
+          unitId,
+          fullName: form.fullName,
+          cpf: form.cpf.replace(/\D/g, ''),
+          type: form.type,
+          companyId: form.companyId || undefined,
+          parentId: form.parentId || undefined,
+        });
+      }
+      setModalOpen(false);
+      startTransition(() => router.refresh());
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Erro ao salvar.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleToggleStatus(u: User) {
+    try {
+      await api.patch(`/users/${u.id}/status`, { status: !u.status });
+      startTransition(() => router.refresh());
+    } catch {
+      alert('Erro ao alterar status.');
+    }
+  }
+
+  async function handleDelete(u: User) {
+    if (!confirm(`Inativar "${u.fullName}"? O histórico será preservado.`)) return;
+    try {
+      await api.delete(`/users/${u.id}`);
+      startTransition(() => router.refresh());
+    } catch {
+      alert('Erro ao inativar beneficiário.');
+    }
+  }
 
   const typeLabel = (type: string) => (type === 'titular' ? 'Titular' : 'Dependente');
 
@@ -49,14 +142,16 @@ export default function BeneficiariosClient({ users }: { users: unknown[] }) {
             Gestão de Beneficiários
           </h1>
           <p className="text-slate-500 text-sm mt-1">
-            {users.length} beneficiários cadastrados — {lista.length} exibidos
+            {userList.length} beneficiários cadastrados — {lista.length} exibidos
+            {isPending && <span className="ml-2 text-primary animate-pulse">atualizando...</span>}
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <button className="bg-primary hover:bg-primary-dark text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm flex items-center gap-2">
-            <Plus size={16} /> Novo Beneficiário
-          </button>
-        </div>
+        <button
+          onClick={openCreate}
+          className="bg-primary hover:bg-primary-dark text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm flex items-center gap-2"
+        >
+          <Plus size={16} /> Novo Beneficiário
+        </button>
       </div>
 
       {/* Filtros */}
@@ -71,20 +166,12 @@ export default function BeneficiariosClient({ users }: { users: unknown[] }) {
             className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
           />
         </div>
-        <select
-          value={typeFilter}
-          onChange={(e) => setTypeFilter(e.target.value)}
-          className="bg-white border border-gray-200 text-sm rounded-lg px-4 py-2 text-slate-700 outline-none"
-        >
+        <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} className="bg-white border border-gray-200 text-sm rounded-lg px-4 py-2 text-slate-700 outline-none">
           <option value="todos">Todos os Vínculos</option>
           <option value="titular">Apenas Titulares</option>
           <option value="dependente">Apenas Dependentes</option>
         </select>
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          className="bg-white border border-gray-200 text-sm rounded-lg px-4 py-2 text-slate-700 outline-none"
-        >
+        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="bg-white border border-gray-200 text-sm rounded-lg px-4 py-2 text-slate-700 outline-none">
           <option value="ativo">Status: Ativo</option>
           <option value="inativo">Status: Inativo</option>
           <option value="todos">Todos</option>
@@ -107,7 +194,7 @@ export default function BeneficiariosClient({ users }: { users: unknown[] }) {
                   <th className="px-6 py-4">CPF</th>
                   <th className="px-6 py-4">Vínculo</th>
                   <th className="px-6 py-4">Status</th>
-                  <th className="px-6 py-4 text-right">Extrato / Ações</th>
+                  <th className="px-6 py-4 text-right">Ações</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
@@ -121,35 +208,33 @@ export default function BeneficiariosClient({ users }: { users: unknown[] }) {
                     </td>
                     <td className="px-6 py-4 font-mono text-xs">{u.cpf}</td>
                     <td className="px-6 py-4">
-                      <span
-                        className={`inline-flex px-2 py-1 text-xs font-semibold rounded-md border ${
-                          u.type === 'titular'
-                            ? 'bg-primary/10 text-primary border-primary/20'
-                            : 'bg-slate-100 text-slate-600 border-slate-200'
-                        }`}
-                      >
+                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-md border ${u.type === 'titular' ? 'bg-primary/10 text-primary border-primary/20' : 'bg-slate-100 text-slate-600 border-slate-200'}`}>
                         {typeLabel(u.type)}
                       </span>
                     </td>
                     <td className="px-6 py-4">
-                      <span
-                        className={`inline-flex px-2 py-1 text-xs font-bold rounded-full ${
-                          u.status ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'
-                        }`}
+                      <button
+                        onClick={() => handleToggleStatus(u)}
+                        className={`inline-flex px-2 py-1 text-xs font-bold rounded-full cursor-pointer transition-opacity hover:opacity-75 ${u.status ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}
                       >
                         {u.status ? 'Ativo' : 'Inativo'}
-                      </span>
+                      </button>
                     </td>
-                    <td className="px-6 py-4 text-right flex items-center justify-end gap-3">
-                      <button title="Ver Histórico de Uso" className="text-slate-400 hover:text-secondary transition-colors p-1">
-                        <ActivitySquare size={18} />
-                      </button>
-                      <button title="Emitir 2ª Via da Carteirinha" className="text-slate-400 hover:text-primary transition-colors p-1">
-                        <CreditCard size={18} />
-                      </button>
-                      <button className="text-slate-400 hover:text-slate-800 p-1">
-                        <MoreVertical size={18} />
-                      </button>
+                    <td className="px-6 py-4 text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        <button title="Ver Histórico" className="text-slate-400 hover:text-secondary transition-colors p-2 rounded-lg hover:bg-slate-50">
+                          <ActivitySquare size={17} />
+                        </button>
+                        <button title="Carteirinha" className="text-slate-400 hover:text-primary transition-colors p-2 rounded-lg hover:bg-slate-50">
+                          <CreditCard size={17} />
+                        </button>
+                        <button title="Editar" onClick={() => openEdit(u)} className="text-slate-400 hover:text-blue-600 transition-colors p-2 rounded-lg hover:bg-blue-50">
+                          <Pencil size={17} />
+                        </button>
+                        <button title="Inativar" onClick={() => handleDelete(u)} className="text-slate-400 hover:text-red-500 transition-colors p-2 rounded-lg hover:bg-red-50">
+                          <Trash2 size={17} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -158,6 +243,107 @@ export default function BeneficiariosClient({ users }: { users: unknown[] }) {
           </div>
         )}
       </div>
+
+      {/* Modal */}
+      <Modal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        title={editingId ? 'Editar Beneficiário' : 'Novo Beneficiário'}
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-bold text-slate-700 mb-1.5">Nome Completo *</label>
+            <input
+              type="text"
+              value={form.fullName}
+              onChange={(e) => setForm({ ...form, fullName: e.target.value })}
+              className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-slate-50"
+              placeholder="Nome completo do beneficiário"
+            />
+          </div>
+
+          {!editingId && (
+            <div>
+              <label className="block text-sm font-bold text-slate-700 mb-1.5">CPF *</label>
+              <input
+                type="text"
+                value={form.cpf}
+                onChange={(e) => setForm({ ...form, cpf: e.target.value })}
+                className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-slate-50 font-mono"
+                placeholder="000.000.000-00"
+                maxLength={14}
+              />
+            </div>
+          )}
+
+          {!editingId && (
+            <div>
+              <label className="block text-sm font-bold text-slate-700 mb-1.5">Tipo de Vínculo *</label>
+              <select
+                value={form.type}
+                onChange={(e) => setForm({ ...form, type: e.target.value, parentId: '' })}
+                className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-slate-50"
+              >
+                <option value="titular">Titular</option>
+                <option value="dependente">Dependente</option>
+              </select>
+            </div>
+          )}
+
+          {!editingId && form.type === 'dependente' && titulares.length > 0 && (
+            <div>
+              <label className="block text-sm font-bold text-slate-700 mb-1.5">Titular Responsável</label>
+              <select
+                value={form.parentId}
+                onChange={(e) => setForm({ ...form, parentId: e.target.value })}
+                className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-slate-50"
+              >
+                <option value="">Selecionar titular...</option>
+                {titulares.map((t) => (
+                  <option key={t.id} value={t.id}>{t.fullName}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {!editingId && companyList.length > 0 && (
+            <div>
+              <label className="block text-sm font-bold text-slate-700 mb-1.5">Empresa</label>
+              <select
+                value={form.companyId}
+                onChange={(e) => setForm({ ...form, companyId: e.target.value })}
+                className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-slate-50"
+              >
+                <option value="">Sem empresa vinculada</option>
+                {companyList.map((c) => (
+                  <option key={c.id} value={c.id}>{c.corporateName}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {error && (
+            <p className="text-sm text-red-600 bg-red-50 border border-red-200 px-4 py-2.5 rounded-lg">{error}</p>
+          )}
+
+          <div className="flex gap-3 pt-2">
+            <button
+              onClick={() => setModalOpen(false)}
+              className="flex-1 border border-gray-200 text-slate-700 py-2.5 rounded-xl font-medium hover:bg-slate-50 transition-colors"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="flex-1 bg-primary text-white py-2.5 rounded-xl font-medium hover:bg-primary-dark transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {saving && <Loader2 size={16} className="animate-spin" />}
+              {saving ? 'Salvando...' : editingId ? 'Salvar Alterações' : 'Cadastrar'}
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

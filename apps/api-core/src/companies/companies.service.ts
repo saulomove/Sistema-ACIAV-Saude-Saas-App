@@ -38,6 +38,10 @@ export class CompaniesService {
     return this.prisma.company.update({ where: { id }, data });
   }
 
+  async remove(id: string) {
+    return this.prisma.company.update({ where: { id }, data: { status: false } });
+  }
+
   async stats(unitId: string) {
     const [total, active, totalUsers] = await Promise.all([
       this.prisma.company.count({ where: { unitId } }),

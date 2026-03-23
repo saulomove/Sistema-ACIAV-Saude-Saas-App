@@ -30,4 +30,8 @@ export class UnitsService {
   async update(id: string, data: { name?: string; subdomain?: string; settings?: string; status?: boolean }) {
     return this.prisma.unit.update({ where: { id }, data });
   }
+
+  async remove(id: string) {
+    return this.prisma.unit.update({ where: { id }, data: { status: false } });
+  }
 }

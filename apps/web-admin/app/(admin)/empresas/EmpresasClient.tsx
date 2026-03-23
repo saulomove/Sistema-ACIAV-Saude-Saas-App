@@ -1,12 +1,16 @@
 'use client';
 
-import { useState } from 'react';
-import { Building, Plus, Search, MoreVertical, FileSpreadsheet, Download, Users } from 'lucide-react';
+import { useState, useTransition } from 'react';
+import { useRouter } from 'next/navigation';
+import { Building, Plus, Search, Pencil, Trash2, FileSpreadsheet, Download, Users, Loader2 } from 'lucide-react';
+import Modal from '../../../components/Modal';
+import { api } from '../../../lib/api-client';
 
 interface Company {
   id: string;
   corporateName: string;
   cnpj?: string;
+  adminEmail?: string;
   status: boolean;
   _count?: { users: number };
 }
@@ -17,12 +21,93 @@ interface CompanyStats {
   totalUsers: number;
 }
 
-export default function EmpresasClient({ companies, stats }: { companies: unknown[]; stats: CompanyStats }) {
+const EMPTY_FORM = { corporateName: '', cnpj: '', adminEmail: '' };
+
+export default function EmpresasClient({
+  companies,
+  stats,
+  unitId,
+}: {
+  companies: unknown[];
+  stats: CompanyStats;
+  unitId: string;
+}) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+
   const [search, setSearch] = useState('');
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [form, setForm] = useState(EMPTY_FORM);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
 
   const lista = (companies as Company[]).filter(
     (c) => !search || c.corporateName.toLowerCase().includes(search.toLowerCase()) || (c.cnpj ?? '').includes(search)
   );
+
+  function openCreate() {
+    setEditingId(null);
+    setForm(EMPTY_FORM);
+    setError('');
+    setModalOpen(true);
+  }
+
+  function openEdit(c: Company) {
+    setEditingId(c.id);
+    setForm({ corporateName: c.corporateName, cnpj: c.cnpj ?? '', adminEmail: c.adminEmail ?? '' });
+    setError('');
+    setModalOpen(true);
+  }
+
+  async function handleSave() {
+    if (!form.corporateName.trim() || !form.cnpj.trim()) {
+      setError('Razão social e CNPJ são obrigatórios.');
+      return;
+    }
+    setSaving(true);
+    setError('');
+    try {
+      if (editingId) {
+        await api.put(`/companies/${editingId}`, {
+          corporateName: form.corporateName,
+          adminEmail: form.adminEmail || undefined,
+        });
+      } else {
+        await api.post('/companies', {
+          unitId,
+          corporateName: form.corporateName,
+          cnpj: form.cnpj.replace(/\D/g, ''),
+          adminEmail: form.adminEmail || 'rh@empresa.com.br',
+        });
+      }
+      setModalOpen(false);
+      startTransition(() => router.refresh());
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Erro ao salvar.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleToggleStatus(c: Company) {
+    try {
+      await api.patch(`/companies/${c.id}/status`, { status: !c.status });
+      startTransition(() => router.refresh());
+    } catch {
+      alert('Erro ao alterar status.');
+    }
+  }
+
+  async function handleDelete(c: Company) {
+    if (!confirm(`Inativar "${c.corporateName}"? Os beneficiários vinculados serão preservados.`)) return;
+    try {
+      await api.delete(`/companies/${c.id}`);
+      startTransition(() => router.refresh());
+    } catch {
+      alert('Erro ao inativar empresa.');
+    }
+  }
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
@@ -33,13 +118,19 @@ export default function EmpresasClient({ companies, stats }: { companies: unknow
             <Building className="text-secondary" />
             Gestão de Empresas (RH)
           </h1>
-          <p className="text-slate-500 text-sm mt-1">Gerencie os polos, RHs conveniados e importe listas de vidas.</p>
+          <p className="text-slate-500 text-sm mt-1">
+            Gerencie os polos, RHs conveniados e importe listas de vidas.
+            {isPending && <span className="ml-2 text-primary animate-pulse">atualizando...</span>}
+          </p>
         </div>
         <div className="flex items-center gap-3">
           <button className="bg-white border border-gray-200 hover:bg-gray-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 shadow-sm">
             <FileSpreadsheet size={16} /> Importar Planilha
           </button>
-          <button className="bg-primary hover:bg-primary-dark text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm flex items-center gap-2">
+          <button
+            onClick={openCreate}
+            className="bg-primary hover:bg-primary-dark text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm flex items-center gap-2"
+          >
             <Plus size={16} /> Nova Empresa
           </button>
         </div>
@@ -104,9 +195,9 @@ export default function EmpresasClient({ companies, stats }: { companies: unknow
             <table className="w-full text-left text-sm text-slate-600">
               <thead className="bg-slate-50 text-slate-500 font-medium border-b border-gray-100">
                 <tr>
-                  <th className="px-6 py-4">Nome da Empresa</th>
+                  <th className="px-6 py-4">Razão Social</th>
                   <th className="px-6 py-4">CNPJ</th>
-                  <th className="px-6 py-4">Vidas Ativas</th>
+                  <th className="px-6 py-4">Beneficiários</th>
                   <th className="px-6 py-4">Status</th>
                   <th className="px-6 py-4 text-right">Ações</th>
                 </tr>
@@ -122,18 +213,22 @@ export default function EmpresasClient({ companies, stats }: { companies: unknow
                       </span>
                     </td>
                     <td className="px-6 py-4">
-                      <span
-                        className={`inline-flex px-2 py-1 text-xs font-bold rounded-full ${
-                          emp.status ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'
-                        }`}
+                      <button
+                        onClick={() => handleToggleStatus(emp)}
+                        className={`inline-flex px-2 py-1 text-xs font-bold rounded-full cursor-pointer hover:opacity-75 transition-opacity ${emp.status ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}
                       >
                         {emp.status ? 'Ativo' : 'Inativo'}
-                      </span>
+                      </button>
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <button className="text-slate-400 hover:text-primary p-1">
-                        <MoreVertical size={18} />
-                      </button>
+                      <div className="flex items-center justify-end gap-1">
+                        <button onClick={() => openEdit(emp)} className="text-slate-400 hover:text-blue-600 p-2 rounded-lg hover:bg-blue-50 transition-colors" title="Editar">
+                          <Pencil size={17} />
+                        </button>
+                        <button onClick={() => handleDelete(emp)} className="text-slate-400 hover:text-red-500 p-2 rounded-lg hover:bg-red-50 transition-colors" title="Inativar">
+                          <Trash2 size={17} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -142,6 +237,65 @@ export default function EmpresasClient({ companies, stats }: { companies: unknow
           </div>
         )}
       </div>
+
+      {/* Modal */}
+      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editingId ? 'Editar Empresa' : 'Nova Empresa'}>
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-bold text-slate-700 mb-1.5">Razão Social *</label>
+            <input
+              type="text"
+              value={form.corporateName}
+              onChange={(e) => setForm({ ...form, corporateName: e.target.value })}
+              className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-slate-50"
+              placeholder="Razão Social da Empresa LTDA"
+            />
+          </div>
+
+          {!editingId && (
+            <div>
+              <label className="block text-sm font-bold text-slate-700 mb-1.5">CNPJ *</label>
+              <input
+                type="text"
+                value={form.cnpj}
+                onChange={(e) => setForm({ ...form, cnpj: e.target.value })}
+                className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-slate-50 font-mono"
+                placeholder="00.000.000/0001-00"
+                maxLength={18}
+              />
+            </div>
+          )}
+
+          <div>
+            <label className="block text-sm font-bold text-slate-700 mb-1.5">E-mail do RH / Responsável</label>
+            <input
+              type="email"
+              value={form.adminEmail}
+              onChange={(e) => setForm({ ...form, adminEmail: e.target.value })}
+              className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-slate-50"
+              placeholder="rh@empresa.com.br"
+            />
+          </div>
+
+          {error && (
+            <p className="text-sm text-red-600 bg-red-50 border border-red-200 px-4 py-2.5 rounded-lg">{error}</p>
+          )}
+
+          <div className="flex gap-3 pt-2">
+            <button onClick={() => setModalOpen(false)} className="flex-1 border border-gray-200 text-slate-700 py-2.5 rounded-xl font-medium hover:bg-slate-50 transition-colors">
+              Cancelar
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="flex-1 bg-primary text-white py-2.5 rounded-xl font-medium hover:bg-primary-dark transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {saving && <Loader2 size={16} className="animate-spin" />}
+              {saving ? 'Salvando...' : editingId ? 'Salvar Alterações' : 'Cadastrar'}
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

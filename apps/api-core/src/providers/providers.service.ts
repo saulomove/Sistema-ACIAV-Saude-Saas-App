@@ -8,7 +8,7 @@ export class ProvidersService {
   async findAll(unitId?: string, category?: string, search?: string) {
     return this.prisma.provider.findMany({
       where: {
-        ...(unitId && { unitId }),
+        ...(unitId && { unitId, status: true }),
         ...(category && { category }),
         ...(search && { name: { contains: search, mode: 'insensitive' } }),
       },
@@ -58,5 +58,9 @@ export class ProvidersService {
 
   async createService(providerId: string, data: { description: string; originalPrice: number; discountedPrice: number }) {
     return this.prisma.service.create({ data: { providerId, ...data } });
+  }
+
+  async remove(id: string) {
+    return this.prisma.provider.update({ where: { id }, data: { status: false } });
   }
 }

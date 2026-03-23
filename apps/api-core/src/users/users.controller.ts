@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Param, Body, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Patch, Param, Body, Query, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { UsersService } from './users.service';
 
@@ -35,5 +35,15 @@ export class UsersController {
   @Put(':id')
   update(@Param('id') id: string, @Body() body: any) {
     return this.usersService.update(id, body);
+  }
+
+  @Patch(':id/status')
+  toggleStatus(@Param('id') id: string, @Body() body: { status: boolean }) {
+    return this.usersService.update(id, { status: body.status });
+  }
+
+  @Delete(':id')
+  remove(@Param('id') id: string) {
+    return this.usersService.remove(id);
   }
 }

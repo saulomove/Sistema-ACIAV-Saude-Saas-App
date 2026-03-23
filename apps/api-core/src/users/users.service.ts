@@ -63,4 +63,8 @@ export class UsersService {
     if (!user) throw new NotFoundException('Usuário não encontrado ou inativo nesta unidade');
     return user;
   }
+
+  async remove(id: string) {
+    return this.prisma.user.update({ where: { id }, data: { status: false } });
+  }
 }

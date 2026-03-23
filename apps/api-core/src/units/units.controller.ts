@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Param, Body, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Param, Body, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { UnitsService } from './units.service';
 
@@ -25,5 +25,10 @@ export class UnitsController {
   @Put(':id')
   update(@Param('id') id: string, @Body() body: any) {
     return this.unitsService.update(id, body);
+  }
+
+  @Delete(':id')
+  remove(@Param('id') id: string) {
+    return this.unitsService.remove(id);
   }
 }
