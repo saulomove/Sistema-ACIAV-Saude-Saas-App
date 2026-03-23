@@ -24,7 +24,8 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const res = await fetch('/api/auth/login', {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+      const res = await fetch(`${apiUrl}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
@@ -37,8 +38,8 @@ export default function LoginPage() {
         return;
       }
 
-      // Salvar token via cookie (server action)
-      await fetch('/api/set-cookie', {
+      // Salvar token em cookie httpOnly via rota interna do Next.js
+      await fetch('/internal/set-cookie', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token: data.token, role: data.user.role }),
