@@ -91,7 +91,7 @@ export default function PremiosPage() {
                                     <div className="text-right w-20">
                                         <p className="text-xs font-medium text-slate-500 mb-0.5">Estoque</p>
                                         <p className="font-bold text-slate-800">
-                                            {typeof item.stock === 'function' ? item.stock() : item.stock}
+                                            {item.stock}
                                         </p>
                                     </div>
                                     <button className="text-slate-400 hover:text-primary font-medium text-sm transition-colors">
