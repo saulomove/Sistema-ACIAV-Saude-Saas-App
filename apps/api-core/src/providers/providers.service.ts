@@ -60,6 +60,14 @@ export class ProvidersService {
     return this.prisma.service.create({ data: { providerId, ...data } });
   }
 
+  async updateService(serviceId: string, data: { description?: string; originalPrice?: number; discountedPrice?: number }) {
+    return this.prisma.service.update({ where: { id: serviceId }, data });
+  }
+
+  async deleteService(serviceId: string) {
+    return this.prisma.service.delete({ where: { id: serviceId } });
+  }
+
   async remove(id: string) {
     return this.prisma.provider.update({ where: { id }, data: { status: false } });
   }

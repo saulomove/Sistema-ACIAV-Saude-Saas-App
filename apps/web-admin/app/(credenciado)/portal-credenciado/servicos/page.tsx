@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
-import { getSessionUser, serverFetch } from '../../../lib/server-api';
-import AtendimentoClient from './AtendimentoClient';
+import { getSessionUser, serverFetch } from '../../../../lib/server-api';
+import ServicosClient from './ServicosClient';
 
 interface Service {
   id: string;
@@ -9,20 +9,12 @@ interface Service {
   discountedPrice: number;
 }
 
-export default async function PortalCredenciadoPage() {
+export default async function ServicosPage() {
   const user = await getSessionUser();
   if (!user || user.role !== 'provider') redirect('/login');
 
   const providerId = user.providerId ?? '';
-  const unitId = user.unitId ?? '';
-
   const services = await serverFetch<Service[]>(`/providers/${providerId}/services`) ?? [];
 
-  return (
-    <AtendimentoClient
-      providerId={providerId}
-      unitId={unitId}
-      services={services}
-    />
-  );
+  return <ServicosClient providerId={providerId} initialServices={services} />;
 }

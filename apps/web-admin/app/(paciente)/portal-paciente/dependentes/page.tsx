@@ -1,75 +1,80 @@
-'use client';
+import { redirect } from 'next/navigation';
+import { getSessionUser, serverFetch } from '../../../../lib/server-api';
+import { Users, CheckCircle2, XCircle } from 'lucide-react';
 
-import { motion } from 'framer-motion';
-import { Users, UserPlus, CheckCircle2 } from 'lucide-react';
+interface Dependent {
+  id: string;
+  fullName: string;
+  cpf: string;
+  type: string;
+  status: boolean;
+}
 
-export default function DependentesPage() {
-    const containerVariants = {
-        hidden: { opacity: 0 },
-        show: { opacity: 1, transition: { staggerChildren: 0.1 } }
-    };
+interface PatientCard {
+  dependents: Dependent[];
+}
 
-    const itemVariants = {
-        hidden: { opacity: 0, y: 30 },
-        show: { opacity: 1, y: 0, transition: { type: "spring" as const, stiffness: 300, damping: 24 } }
-    };
+function maskCPF(cpf: string) {
+  return cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+}
 
-    const dependentes = [
-        { id: 1, nome: "Maria Joaquina", parentesco: "Cônjuge", cpf: "111.222.333-44", status: "Ativo" },
-        { id: 2, nome: "João Marcos", parentesco: "Filho(a)", cpf: "555.666.777-88", status: "Em Análise" },
-    ];
+function typeLabel(type: string) {
+  const map: Record<string, string> = {
+    conjuge: 'Cônjuge',
+    filho: 'Filho(a)',
+    pai: 'Pai/Mãe',
+    dependente: 'Dependente',
+  };
+  return map[type?.toLowerCase()] ?? type;
+}
 
-    return (
-        <motion.div
-            variants={containerVariants}
-            initial="hidden"
-            animate="show"
-            className="max-w-4xl mx-auto space-y-8"
-        >
-            <motion.div variants={itemVariants} className="flex justify-between items-end pb-6 border-b border-gray-100">
-                <div>
-                    <h1 className="text-3xl font-black text-slate-800 tracking-tight">Meus Dependentes</h1>
-                    <p className="text-slate-500 mt-2 font-medium">Cadastre e gerencie o acesso da sua família à rede ACIAV Saúde.</p>
+export default async function DependentesPage() {
+  const user = await getSessionUser();
+  if (!user || user.role !== 'patient') redirect('/login');
+
+  const card = await serverFetch<PatientCard>(`/users/me/card`);
+  const dependents = card?.dependents ?? [];
+
+  return (
+    <div className="max-w-4xl mx-auto space-y-8">
+      <div className="flex justify-between items-end pb-6 border-b border-gray-100">
+        <div>
+          <h1 className="text-3xl font-black text-slate-800 tracking-tight">Meus Dependentes</h1>
+          <p className="text-slate-500 mt-2 font-medium">Membros da família cadastrados no seu plano ACIAV Saúde.</p>
+        </div>
+      </div>
+
+      {dependents.length === 0 ? (
+        <div className="text-center py-16 bg-white rounded-3xl border border-gray-100 shadow-sm">
+          <Users className="mx-auto h-12 w-12 text-slate-300 mb-4" />
+          <h3 className="text-lg font-bold text-slate-800">Nenhum dependente cadastrado</h3>
+          <p className="text-slate-500 mt-2 text-sm">Entre em contato com o RH da sua empresa para adicionar dependentes.</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {dependents.map((dep) => (
+            <div key={dep.id} className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex flex-col gap-4">
+              <div className="flex items-start gap-4">
+                <div className="w-14 h-14 bg-[#007178]/10 text-[#007178] rounded-2xl flex items-center justify-center flex-shrink-0">
+                  <Users size={24} />
                 </div>
-                <button className="bg-primary hover:bg-primary-dark text-white px-6 py-3 rounded-xl font-bold transition-all shadow-md hover:shadow-xl flex items-center gap-2">
-                    <UserPlus size={20} /> Adicionar Novo
-                </button>
-            </motion.div>
+                <div>
+                  <h3 className="text-xl font-bold text-slate-800">{dep.fullName}</h3>
+                  <p className="text-sm text-slate-500">{typeLabel(dep.type)} · {maskCPF(dep.cpf)}</p>
+                  <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold mt-2 ${dep.status ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-600'}`}>
+                    {dep.status ? <CheckCircle2 size={12} /> : <XCircle size={12} />}
+                    {dep.status ? 'Ativo' : 'Inativo'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
-            <motion.div variants={itemVariants} className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {dependentes.map((dep) => (
-                    <motion.div
-                        key={dep.id}
-                        whileHover={{ y: -4 }}
-                        className="bg-white p-6 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100 flex flex-col justify-between group overflow-hidden relative"
-                    >
-                        <div className="absolute top-0 right-0 w-32 h-32 bg-slate-50 rounded-full blur-3xl -mr-10 -mt-10 group-hover:bg-primary/5 transition-colors"></div>
-                        <div className="relative z-10 flex items-start gap-4">
-                            <div className="w-14 h-14 bg-slate-100 text-slate-600 rounded-2xl flex items-center justify-center flex-shrink-0 group-hover:bg-primary/10 group-hover:text-primary transition-colors">
-                                <Users size={24} />
-                            </div>
-                            <div>
-                                <h3 className="text-xl font-bold text-slate-800 group-hover:text-primary transition-colors">{dep.nome}</h3>
-                                <p className="text-sm text-slate-500 font-medium mb-1">{dep.parentesco} • {dep.cpf}</p>
-                                <span className={`inline-flex px-3 py-1 rounded-full text-xs font-bold mt-2 ${dep.status === 'Ativo' ? 'bg-primary/10 text-primary border border-primary/20' : 'bg-orange-100 text-secondary border border-orange-200'}`}>
-                                    {dep.status === 'Ativo' && <CheckCircle2 size={12} className="mr-1 inline-block" />} {dep.status}
-                                </span>
-                            </div>
-                        </div>
-                        <div className="relative z-10 mt-6 pt-4 border-t border-gray-100 flex gap-3">
-                            {dep.status === 'Ativo' && (
-                                <button className="flex-1 py-2 text-sm font-bold text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl transition-colors">
-                                    Ver Carteirinha
-                                </button>
-                            )}
-                            <button className="flex-1 py-2 text-sm font-bold text-slate-500 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors">
-                                Remover
-                            </button>
-                        </div>
-                    </motion.div>
-                ))}
-            </motion.div>
-
-        </motion.div>
-    );
+      <div className="bg-slate-50 border border-gray-200 rounded-2xl p-5 text-sm text-slate-500">
+        <strong className="text-slate-700">Precisa adicionar ou remover dependentes?</strong> Entre em contato com o setor de RH da sua empresa. Somente colaboradores com acesso ao Portal RH podem gerenciar dependentes.
+      </div>
+    </div>
+  );
 }

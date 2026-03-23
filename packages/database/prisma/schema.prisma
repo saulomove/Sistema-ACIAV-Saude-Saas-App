@@ -42,7 +42,7 @@ model User {
   companyId     String?
   unitId        String
   fullName      String
-  cpf           String   @unique
+  cpf           String
   type          String   // 'titular' or 'dependente'
   parentId      String?
   pointsBalance Int      @default(0)
@@ -55,6 +55,8 @@ model User {
   parent       User?          @relation("UserToDependents", fields: [parentId], references: [id])
   dependents   User[]         @relation("UserToDependents")
   transactions Transaction[]
+
+  @@unique([cpf, unitId])
 }
 
 model Provider {

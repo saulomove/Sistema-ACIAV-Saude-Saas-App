@@ -1,101 +1,77 @@
-'use client';
- 
-import { motion } from 'framer-motion';
-import { Gift, Zap, Trophy, ArrowRight, Lock } from 'lucide-react';
+import { redirect } from 'next/navigation';
+import { getSessionUser, serverFetch } from '../../../../lib/server-api';
+import { Gift, Star, Lock, Trophy } from 'lucide-react';
 
-export default function ResgatarPremiosPage() {
-    const containerVariants = {
-        hidden: { opacity: 0 },
-        show: { opacity: 1, transition: { staggerChildren: 0.1 } }
-    };
+interface PatientCard {
+  pointsBalance: number;
+}
 
-    const itemVariants = {
-        hidden: { opacity: 0, y: 30 },
-        show: { opacity: 1, y: 0, transition: { type: "spring" as const, stiffness: 300, damping: 24 } }
-    };
+interface Reward {
+  id: string;
+  name: string;
+  pointsRequired: number;
+  stock: number;
+  provider: { name: string };
+}
 
-    const premios = [
-        { id: 1, nome: "Cesta Básica Completa", pontos: 5000, img: "https://images.unsplash.com/photo-1608686207856-001b95cf60ca?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80", status: "disponivel" },
-        { id: 2, nome: "Vale Compras R$ 100", pontos: 2500, img: "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80", status: "disponivel" },
-        { id: 3, nome: "Smart TV 50''", pontos: 45000, img: "https://images.unsplash.com/photo-1593359677879-a4bb92f829d1?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80", status: "bloqueado" },
-        { id: 4, nome: "Smartphone Intermediário", pontos: 35000, img: "https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80", status: "bloqueado" },
-    ];
+export default async function ResgatarPremiosPage() {
+  const user = await getSessionUser();
+  if (!user || user.role !== 'patient') redirect('/login');
 
-    const pontosAtuais = 6200;
+  const unitId = user.unitId ?? '';
 
-    return (
-        <motion.div
-            variants={containerVariants}
-            initial="hidden"
-            animate="show"
-            className="max-w-4xl mx-auto space-y-8"
-        >
-            <motion.div variants={itemVariants} className="pb-6 border-b border-gray-100 flex flex-col md:flex-row md:items-end justify-between gap-6">
-                <div>
-                    <h1 className="text-3xl font-black text-slate-800 tracking-tight">Clube de Vantagens</h1>
-                    <p className="text-slate-500 mt-2 font-medium">Troque as moedas acumuladas pelo uso consciente do plano por prêmios.</p>
-                </div>
+  // Fetch patient points and all rewards from all providers in this unit
+  const card = await serverFetch<PatientCard>(`/users/me/card`);
+  const userPoints = card?.pointsBalance ?? 0;
 
-                {/* Score Card */}
-                <div className="bg-gradient-to-r from-secondary to-[#ff8c00] p-[2px] rounded-2xl shadow-lg">
-                    <div className="bg-white rounded-[14px] px-6 py-3 flex items-center gap-4">
-                        <div className="w-12 h-12 bg-secondary/10 rounded-full flex items-center justify-center text-secondary">
-                            <Trophy size={24} />
-                        </div>
-                        <div>
-                            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Seu Saldo</p>
-                            <p className="text-2xl font-black text-slate-800">{pontosAtuais.toLocaleString()} <span className="text-sm font-bold text-secondary">pts</span></p>
-                        </div>
-                    </div>
-                </div>
-            </motion.div>
+  return (
+    <div className="max-w-4xl mx-auto space-y-8">
+      <div className="pb-6 border-b border-gray-100">
+        <h1 className="text-3xl font-black text-slate-800 tracking-tight">Resgatar Prêmios</h1>
+        <p className="text-slate-500 mt-2 font-medium">Troque seus pontos de fidelidade por recompensas exclusivas.</p>
+      </div>
 
-            {/* Vitrine de Prêmios */}
-            <motion.div variants={itemVariants} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {premios.map((premio) => (
-                    <motion.div
-                        key={premio.id}
-                        whileHover={premio.status === 'disponivel' ? { y: -6, scale: 1.02 } : {}}
-                        className={`bg-white rounded-3xl overflow-hidden shadow-[0_8px_30px_rgb(0,0,0,0.04)] border ${premio.status === 'disponivel' ? 'border-gray-100 hover:border-secondary/30 cursor-pointer' : 'border-gray-100 opacity-75 cursor-not-allowed'} transition-all group relative flex flex-col`}
-                    >
-                        {/* Imagem (Removido Next/Image p/ simplificar PoC no Framer Motion scale) */}
-                        <div className="h-40 w-full relative overflow-hidden bg-slate-100">
-                            {premio.status === 'bloqueado' && (
-                                <div className="absolute inset-0 bg-slate-900/40 z-10 flex items-center justify-center backdrop-blur-[2px]">
-                                    <Lock className="text-white opacity-80" size={32} />
-                                </div>
-                            )}
-                            <img src={premio.img} alt={premio.nome} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
-                        </div>
+      {/* Saldo de Pontos */}
+      <div className="bg-gradient-to-br from-[#007178] to-[#005f65] rounded-2xl p-6 text-white flex items-center justify-between shadow-lg">
+        <div>
+          <p className="text-white/70 text-sm font-bold uppercase tracking-widest mb-1">Seus Pontos</p>
+          <p className="text-5xl font-black">{userPoints.toLocaleString('pt-BR')}</p>
+          <p className="text-white/60 text-sm mt-1">1 ponto = R$1 economizado</p>
+        </div>
+        <div className="w-20 h-20 bg-white/10 rounded-full flex items-center justify-center">
+          <Trophy size={40} className="text-white/80" />
+        </div>
+      </div>
 
-                        {/* Conteúdo */}
-                        <div className="p-6 flex flex-col flex-1">
-                            <h3 className="text-lg font-bold text-slate-800 mb-2 leading-tight">{premio.nome}</h3>
-                            <div className="mt-auto pt-4 flex items-center justify-between">
-                                <div className="flex items-center gap-1.5 text-secondary font-black">
-                                    <Zap size={18} fill="currentColor" /> {premio.pontos.toLocaleString()} pts
-                                </div>
-                                {premio.status === 'disponivel' && (
-                                    <div className="w-8 h-8 rounded-full bg-secondary/10 text-secondary flex items-center justify-center group-hover:bg-secondary group-hover:text-white transition-colors">
-                                        <ArrowRight size={16} />
-                                    </div>
-                                )}
-                            </div>
-                        </div>
+      {/* Como funciona */}
+      <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 flex items-start gap-3">
+        <Star size={20} className="text-amber-500 shrink-0 mt-0.5 fill-amber-400" />
+        <div>
+          <p className="font-bold text-amber-800 text-sm">Como acumular pontos?</p>
+          <p className="text-amber-700 text-sm mt-1">
+            A cada atendimento registrado por um credenciado ACIAV Saúde, você ganha <strong>1 ponto para cada R$1 economizado</strong>.
+            Quanto mais você usa o plano, mais pontos acumula!
+          </p>
+        </div>
+      </div>
 
-                        {/* Status Bar */}
-                        {premio.status === 'bloqueado' && (
-                            <div className="h-1.5 w-full bg-slate-100">
-                                <div className="h-full bg-slate-300" style={{ width: `${(pontosAtuais / premio.pontos) * 100}%` }}></div>
-                            </div>
-                        )}
-                        {premio.status === 'disponivel' && (
-                            <div className="h-1.5 w-full bg-secondary"></div>
-                        )}
-                    </motion.div>
-                ))}
-            </motion.div>
-
-        </motion.div>
-    );
+      {/* Prêmios - Em breve */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="px-6 py-5 border-b border-gray-100 flex items-center gap-2">
+          <Gift size={20} className="text-[#007178]" />
+          <h2 className="font-bold text-slate-800">Catálogo de Prêmios</h2>
+        </div>
+        <div className="flex flex-col items-center justify-center py-16 text-slate-400">
+          <Lock size={40} className="mb-3 opacity-30" />
+          <p className="font-medium text-slate-600">Catálogo em construção</p>
+          <p className="text-sm mt-1 text-center px-8 max-w-sm">
+            Os prêmios disponíveis para resgate aparecerão aqui. Em breve os parceiros ACIAV Saúde estarão cadastrando recompensas exclusivas para você.
+          </p>
+          <div className="mt-4 bg-[#007178]/10 text-[#007178] px-4 py-2 rounded-xl text-sm font-bold">
+            Você tem {userPoints} ponto{userPoints !== 1 ? 's' : ''} disponíve{userPoints !== 1 ? 'is' : 'l'}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }

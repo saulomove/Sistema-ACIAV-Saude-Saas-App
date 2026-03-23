@@ -2,19 +2,26 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Stethoscope, Clock, ShieldCheck, Gift, Settings, LogOut } from 'lucide-react';
+import { Stethoscope, Clock, ShieldCheck, Gift, LogOut, Wrench } from 'lucide-react';
 import Image from 'next/image';
 import clsx from 'clsx';
 
 const menuItems = [
-  { name: 'Novo Atendimento', icon: ShieldCheck, href: '/portal-credenciado' },
-  { name: 'Meus Serviços', icon: Stethoscope, href: '/portal-credenciado/servicos' },
-  { name: 'Histórico & Faturamento', icon: Clock, href: '/portal-credenciado/historico' },
-  { name: 'Gamificação (Dar Pontos)', icon: Gift, href: '/portal-credenciado/gamificacao' },
-  { name: 'Configurações', icon: Settings, href: '/portal-credenciado/configuracoes' },
+  { name: 'Atendimento', icon: ShieldCheck, href: '/portal-credenciado' },
+  { name: 'Meus Serviços', icon: Wrench, href: '/portal-credenciado/servicos' },
+  { name: 'Histórico', icon: Clock, href: '/portal-credenciado/historico' },
+  { name: 'Gamificação', icon: Gift, href: '/portal-credenciado/gamificacao' },
 ];
 
-export default function SidebarCred() {
+export default function SidebarCred({
+  providerId,
+  providerName,
+  providerCategory,
+}: {
+  providerId: string;
+  providerName: string;
+  providerCategory: string;
+}) {
   const pathname = usePathname();
   const router = useRouter();
 
@@ -33,10 +40,16 @@ export default function SidebarCred() {
         <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Portal do Parceiro</p>
       </div>
 
+      {/* Provider info */}
+      <div className="px-4 py-3 bg-black/20 border-b border-white/10">
+        <p className="text-xs text-white/60 font-medium">{providerCategory}</p>
+        <p className="text-sm font-bold text-white truncate">{providerName}</p>
+      </div>
+
       {/* Nav */}
-      <nav className="flex-1 p-4 space-y-2 mt-4">
+      <nav className="flex-1 p-4 space-y-1 mt-2">
         {menuItems.map((item) => {
-          const isActive = pathname === item.href;
+          const isActive = pathname === item.href || (item.href !== '/portal-credenciado' && pathname.startsWith(item.href));
           const Icon = item.icon;
           return (
             <Link

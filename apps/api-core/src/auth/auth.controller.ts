@@ -10,6 +10,7 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  ForbiddenException,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { AuthService } from './auth.service';
@@ -40,26 +41,38 @@ export class AuthController {
 
   @Get('admin-users')
   @UseGuards(AuthGuard('jwt'))
-  listAdminUsers(@Query('role') role?: string, @Query('unitId') unitId?: string) {
+  listAdminUsers(@Req() req: any, @Query('role') role?: string, @Query('unitId') unitId?: string) {
+    if (req.user?.role !== 'super_admin') {
+      throw new ForbiddenException('Acesso restrito ao Super Admin.');
+    }
     return this.authService.listAdminUsers({ role, unitId });
   }
 
   @Post('admin-users')
   @UseGuards(AuthGuard('jwt'))
-  createAdminUser(@Body() body: {
-    email: string;
-    password: string;
-    role: string;
-    unitId?: string;
-    companyId?: string;
-    providerId?: string;
-  }) {
+  createAdminUser(
+    @Req() req: any,
+    @Body() body: {
+      email: string;
+      password: string;
+      role: string;
+      unitId?: string;
+      companyId?: string;
+      providerId?: string;
+    },
+  ) {
+    if (req.user?.role !== 'super_admin') {
+      throw new ForbiddenException('Acesso restrito ao Super Admin.');
+    }
     return this.authService.createAdminUser(body);
   }
 
   @Patch('admin-users/:id/status')
   @UseGuards(AuthGuard('jwt'))
-  toggleStatus(@Param('id') id: string, @Body() body: { status: boolean }) {
+  toggleStatus(@Req() req: any, @Param('id') id: string, @Body() body: { status: boolean }) {
+    if (req.user?.role !== 'super_admin') {
+      throw new ForbiddenException('Acesso restrito ao Super Admin.');
+    }
     return this.authService.toggleAdminUserStatus(id, body.status);
   }
 }

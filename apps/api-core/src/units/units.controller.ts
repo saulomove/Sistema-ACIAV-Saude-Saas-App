@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Param, Body, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Param, Body, UseGuards, Req, ForbiddenException } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { UnitsService } from './units.service';
 
@@ -8,7 +8,10 @@ export class UnitsController {
   constructor(private unitsService: UnitsService) {}
 
   @Get()
-  findAll() {
+  findAll(@Req() req: any) {
+    if (req.user?.role !== 'super_admin') {
+      throw new ForbiddenException('Acesso restrito ao Super Admin.');
+    }
     return this.unitsService.findAll();
   }
 
@@ -18,17 +21,26 @@ export class UnitsController {
   }
 
   @Post()
-  create(@Body() body: { name: string; subdomain: string; settings?: string }) {
+  create(@Req() req: any, @Body() body: { name: string; subdomain: string; settings?: string }) {
+    if (req.user?.role !== 'super_admin') {
+      throw new ForbiddenException('Acesso restrito ao Super Admin.');
+    }
     return this.unitsService.create(body);
   }
 
   @Put(':id')
-  update(@Param('id') id: string, @Body() body: any) {
+  update(@Req() req: any, @Param('id') id: string, @Body() body: any) {
+    if (req.user?.role !== 'super_admin') {
+      throw new ForbiddenException('Acesso restrito ao Super Admin.');
+    }
     return this.unitsService.update(id, body);
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string) {
+  remove(@Req() req: any, @Param('id') id: string) {
+    if (req.user?.role !== 'super_admin') {
+      throw new ForbiddenException('Acesso restrito ao Super Admin.');
+    }
     return this.unitsService.remove(id);
   }
 }

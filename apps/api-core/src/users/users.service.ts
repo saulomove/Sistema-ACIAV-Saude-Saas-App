@@ -68,12 +68,35 @@ export class UsersService {
     return this.prisma.user.update({ where: { id }, data: { status: false } });
   }
 
+  async getUserTransactions(userId: string) {
+    return this.prisma.transaction.findMany({
+      where: { userId },
+      include: {
+        provider: { select: { name: true, category: true } },
+        service: { select: { description: true, originalPrice: true, discountedPrice: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async getPatientCard(userId: string) {
+    if (!userId) return null;
+    return this.prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        company: { select: { corporateName: true } },
+        dependents: { select: { id: true, fullName: true, cpf: true, type: true, status: true } },
+        _count: { select: { transactions: true } },
+      },
+    });
+  }
+
   async importBatch(users: Array<{ unitId: string; companyId: string; fullName: string; cpf: string; type: string }>) {
     const results = { created: 0, skipped: 0, errors: [] as string[] };
 
     for (const u of users) {
       try {
-        const existing = await this.prisma.user.findUnique({ where: { cpf: u.cpf } });
+        const existing = await this.prisma.user.findFirst({ where: { cpf: u.cpf, unitId: u.unitId } });
         if (existing) {
           results.skipped++;
           continue;

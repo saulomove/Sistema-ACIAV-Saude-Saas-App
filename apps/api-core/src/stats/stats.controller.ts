@@ -1,4 +1,4 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Query, UseGuards, Req, ForbiddenException } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { StatsService } from './stats.service';
 
@@ -13,7 +13,10 @@ export class StatsController {
   }
 
   @Get('global')
-  getGlobal() {
+  getGlobal(@Req() req: any) {
+    if (req.user?.role !== 'super_admin') {
+      throw new ForbiddenException('Acesso restrito ao Super Admin.');
+    }
     return this.statsService.getGlobalStats();
   }
 

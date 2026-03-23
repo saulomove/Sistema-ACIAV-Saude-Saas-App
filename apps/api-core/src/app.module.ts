@@ -8,6 +8,7 @@ import { UnitsModule } from './units/units.module';
 import { CompaniesModule } from './companies/companies.module';
 import { ProvidersModule } from './providers/providers.module';
 import { StatsModule } from './stats/stats.module';
+import { TransactionsModule } from './transactions/transactions.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { StatsModule } from './stats/stats.module';
     CompaniesModule,
     ProvidersModule,
     StatsModule,
+    TransactionsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

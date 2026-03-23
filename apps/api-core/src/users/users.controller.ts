@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Patch, Param, Body, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Patch, Param, Body, Query, UseGuards, Req } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { UsersService } from './users.service';
 
@@ -25,6 +25,16 @@ export class UsersController {
   @Post('import')
   importBatch(@Body() body: { users: Array<{ unitId: string; companyId: string; fullName: string; cpf: string; type: string }> }) {
     return this.usersService.importBatch(body.users);
+  }
+
+  @Get('me/card')
+  getMyCard(@Req() req: any) {
+    return this.usersService.getPatientCard(req.user.userId);
+  }
+
+  @Get(':id/transactions')
+  getUserTransactions(@Param('id') id: string) {
+    return this.usersService.getUserTransactions(id);
   }
 
   @Get(':id')

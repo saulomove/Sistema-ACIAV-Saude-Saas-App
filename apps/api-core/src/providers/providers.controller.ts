@@ -55,4 +55,14 @@ export class ProvidersController {
   createService(@Param('id') id: string, @Body() body: any) {
     return this.providersService.createService(id, body);
   }
+
+  @Put('services/:serviceId')
+  updateService(@Param('serviceId') serviceId: string, @Body() body: any) {
+    return this.providersService.updateService(serviceId, body);
+  }
+
+  @Delete('services/:serviceId')
+  deleteService(@Param('serviceId') serviceId: string) {
+    return this.providersService.deleteService(serviceId);
+  }
 }
