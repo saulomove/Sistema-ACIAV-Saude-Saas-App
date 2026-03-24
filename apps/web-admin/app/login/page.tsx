@@ -66,15 +66,14 @@ export default function LoginPage() {
 
         {/* Logo */}
         <div className="relative z-10">
-          <div className="w-48 relative h-12">
-            <Image
-              src="/logo-aciav-saude.png"
-              alt="ACIAV Saúde"
-              fill
-              className="object-contain object-left brightness-0 invert"
-              priority
-            />
-          </div>
+          <Image
+            src="/logo-aciav-saude.png"
+            alt="ACIAV Saúde"
+            width={192}
+            height={48}
+            className="object-contain brightness-0 invert"
+            priority
+          />
         </div>
 
         {/* Conteúdo central */}
@@ -115,9 +114,7 @@ export default function LoginPage() {
         <div className="w-full max-w-sm">
           {/* Mobile logo */}
           <div className="flex lg:hidden justify-center mb-8">
-            <div className="w-40 h-10 relative">
-              <Image src="/logo-aciav-saude.png" alt="ACIAV Saúde" fill className="object-contain" priority />
-            </div>
+            <Image src="/logo-aciav-saude.png" alt="ACIAV Saúde" width={160} height={40} className="object-contain" priority />
           </div>
 
           {/* Header */}

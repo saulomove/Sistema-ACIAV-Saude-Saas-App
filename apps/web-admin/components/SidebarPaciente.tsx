@@ -61,9 +61,7 @@ export default function SidebarPaciente({
 
       {/* Brand */}
       <div className="h-24 flex flex-col items-center justify-center border-b border-gray-100 bg-white pt-4 pb-2 shrink-0 relative z-10">
-        <div className="w-40 relative h-10 mb-1">
-          <Image src="/logo-aciav-saude.png" alt="ACIAV Saúde" fill className="object-contain object-center" priority />
-        </div>
+        <Image src="/logo-aciav-saude.png" alt="ACIAV Saúde" width={160} height={40} className="object-contain" priority />
         <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Portal do Paciente</p>
         <button
           className="md:hidden absolute right-3 top-3 p-1 text-slate-400 hover:text-slate-700"

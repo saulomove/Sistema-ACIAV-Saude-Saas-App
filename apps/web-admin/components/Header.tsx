@@ -9,9 +9,7 @@ export default function Header({ role, unitName }: { role: string; unitName: str
       <div className="flex items-center gap-4 flex-1">
         {/* Mobile logo — shown only on mobile (hamburger occupies left corner) */}
         <div className="md:hidden pl-10 flex items-center">
-          <div className="w-28 h-8 relative">
-            <Image src="/logo-aciav-saude.png" alt="ACIAV Saúde" fill className="object-contain object-left" priority />
-          </div>
+          <Image src="/logo-aciav-saude.png" alt="ACIAV Saúde" width={112} height={32} className="object-contain" priority />
         </div>
         <div className="relative w-full max-w-md hidden md:block">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={17} />
