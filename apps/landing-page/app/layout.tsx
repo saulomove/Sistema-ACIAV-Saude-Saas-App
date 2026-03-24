@@ -21,15 +21,14 @@ export default function RootLayout({
                 <header className="fixed w-full bg-white/80 backdrop-blur-md z-50 border-b border-gray-100 transition-all">
                     <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                            <div className="w-32 relative h-10">
-                                <Image
-                                    src="/logo-aciav-saude.png"
-                                    alt="ACIAV Saúde"
-                                    fill
-                                    className="object-contain object-left"
-                                    priority
-                                />
-                            </div>
+                            <Image
+                                src="/logo-aciav-saude.png"
+                                alt="ACIAV Saúde"
+                                width={128}
+                                height={40}
+                                className="object-contain"
+                                priority
+                            />
                         </div>
                         <nav className="hidden md:flex gap-8 text-sm font-medium text-slate-600">
                             <a href="#o-projeto" className="hover:text-brand-primary transition-colors">O Projeto</a>

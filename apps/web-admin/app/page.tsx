@@ -24,9 +24,7 @@ export default function LandingPage() {
       {/* Navbar */}
       <nav className="sticky top-0 z-50 bg-white/90 backdrop-blur border-b border-gray-100 shadow-sm">
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-          <div className="w-36 h-9 relative">
-            <Image src="/logo-aciav-saude.png" alt="ACIAV Saúde" fill className="object-contain object-left" priority />
-          </div>
+          <Image src="/logo-aciav-saude.png" alt="ACIAV Saúde" width={144} height={36} className="object-contain" priority />
           <Link
             href="/login"
             className="bg-secondary hover:bg-orange-600 text-white px-5 py-2 rounded-xl text-sm font-bold transition-colors shadow-sm flex items-center gap-2"
