@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Patch, Param, Body, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Patch, Param, Body, Query, UseGuards, Req } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { ProvidersService } from './providers.service';
 
@@ -9,16 +9,20 @@ export class ProvidersController {
 
   @Get()
   findAll(
+    @Req() req: any,
     @Query('unitId') unitId?: string,
     @Query('category') category?: string,
     @Query('search') search?: string,
   ) {
-    return this.providersService.findAll(unitId, category, search);
+    // Usuários não-super_admin só podem ver credenciados da própria unidade
+    const effectiveUnitId = req.user.role === 'super_admin' ? unitId : (req.user.unitId ?? unitId);
+    return this.providersService.findAll(effectiveUnitId, category, search);
   }
 
   @Get('ranking')
-  ranking(@Query('unitId') unitId: string, @Query('limit') limit?: string) {
-    return this.providersService.ranking(unitId, limit ? parseInt(limit) : 5);
+  ranking(@Req() req: any, @Query('unitId') unitId: string, @Query('limit') limit?: string) {
+    const effectiveUnitId = req.user.role === 'super_admin' ? unitId : (req.user.unitId ?? unitId);
+    return this.providersService.ranking(effectiveUnitId, limit ? parseInt(limit) : 5);
   }
 
   @Get(':id')
@@ -27,8 +31,9 @@ export class ProvidersController {
   }
 
   @Post()
-  create(@Body() body: any) {
-    return this.providersService.create(body);
+  create(@Req() req: any, @Body() body: any) {
+    const data = { ...body, unitId: req.user.unitId ?? body.unitId };
+    return this.providersService.create(data);
   }
 
   @Put(':id')

@@ -8,8 +8,10 @@ export class StatsController {
   constructor(private statsService: StatsService) {}
 
   @Get('dashboard')
-  getDashboard(@Query('unitId') unitId?: string) {
-    return this.statsService.getDashboardStats(unitId);
+  getDashboard(@Req() req: any, @Query('unitId') unitId?: string) {
+    // Não-super_admin só pode ver stats da própria unidade
+    const effectiveUnitId = req.user.role === 'super_admin' ? unitId : (req.user.unitId ?? unitId);
+    return this.statsService.getDashboardStats(effectiveUnitId);
   }
 
   @Get('global')

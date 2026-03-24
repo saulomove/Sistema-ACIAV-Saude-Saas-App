@@ -9,12 +9,17 @@ export class UsersController {
 
   @Get()
   findAll(
+    @Req() req: any,
     @Query('unitId') unitId?: string,
     @Query('companyId') companyId?: string,
     @Query('search') search?: string,
     @Query('type') type?: string,
   ) {
-    return this.usersService.findAll(unitId, companyId, search, type);
+    // Usuários não-super_admin só podem ver dados da própria unidade
+    const effectiveUnitId = req.user.role === 'super_admin' ? unitId : (req.user.unitId ?? unitId);
+    // RH só pode ver usuários da própria empresa
+    const effectiveCompanyId = req.user.role === 'rh' ? (req.user.companyId ?? companyId) : companyId;
+    return this.usersService.findAll(effectiveUnitId, effectiveCompanyId, search, type);
   }
 
   @Get('validate/:cpf')
@@ -23,8 +28,17 @@ export class UsersController {
   }
 
   @Post('import')
-  importBatch(@Body() body: { users: Array<{ unitId: string; companyId: string; fullName: string; cpf: string; type: string }> }) {
-    return this.usersService.importBatch(body.users);
+  importBatch(
+    @Req() req: any,
+    @Body() body: { users: Array<{ unitId: string; companyId: string; fullName: string; cpf: string; type: string }> },
+  ) {
+    // Força unitId e companyId do token para evitar import cross-tenant
+    const users = body.users.map((u) => ({
+      ...u,
+      unitId: req.user.unitId ?? u.unitId,
+      companyId: req.user.companyId ?? u.companyId,
+    }));
+    return this.usersService.importBatch(users);
   }
 
   @Get('me/card')
@@ -43,8 +57,10 @@ export class UsersController {
   }
 
   @Post()
-  create(@Body() body: any) {
-    return this.usersService.create(body);
+  create(@Req() req: any, @Body() body: any) {
+    // Força unitId do token para garantir isolamento de tenant
+    const data = { ...body, unitId: req.user.unitId ?? body.unitId };
+    return this.usersService.create(data);
   }
 
   @Put(':id')

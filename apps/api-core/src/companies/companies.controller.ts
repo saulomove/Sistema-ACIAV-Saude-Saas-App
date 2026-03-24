@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Patch, Param, Body, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Patch, Param, Body, Query, UseGuards, Req } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { CompaniesService } from './companies.service';
 
@@ -8,13 +8,16 @@ export class CompaniesController {
   constructor(private companiesService: CompaniesService) {}
 
   @Get()
-  findAll(@Query('unitId') unitId?: string, @Query('search') search?: string) {
-    return this.companiesService.findAll(unitId, search);
+  findAll(@Req() req: any, @Query('unitId') unitId?: string, @Query('search') search?: string) {
+    // Usuários não-super_admin só podem ver empresas da própria unidade
+    const effectiveUnitId = req.user.role === 'super_admin' ? unitId : (req.user.unitId ?? unitId);
+    return this.companiesService.findAll(effectiveUnitId, search);
   }
 
   @Get('stats')
-  stats(@Query('unitId') unitId: string) {
-    return this.companiesService.stats(unitId);
+  stats(@Req() req: any, @Query('unitId') unitId: string) {
+    const effectiveUnitId = req.user.role === 'super_admin' ? unitId : (req.user.unitId ?? unitId);
+    return this.companiesService.stats(effectiveUnitId);
   }
 
   @Get(':id')
@@ -23,8 +26,9 @@ export class CompaniesController {
   }
 
   @Post()
-  create(@Body() body: any) {
-    return this.companiesService.create(body);
+  create(@Req() req: any, @Body() body: any) {
+    const data = { ...body, unitId: req.user.unitId ?? body.unitId };
+    return this.companiesService.create(data);
   }
 
   @Put(':id')

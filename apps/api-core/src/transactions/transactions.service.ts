@@ -1,9 +1,28 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class TransactionsService {
   constructor(private prisma: PrismaService) {}
+
+  async createWithUnitValidation(data: {
+    userId: string;
+    providerId: string;
+    serviceId: string;
+    amountSaved: number;
+    providerUnitId?: string;
+  }) {
+    // Valida que o beneficiário pertence à mesma unidade do credenciado
+    if (data.providerUnitId) {
+      const user = await this.prisma.user.findFirst({
+        where: { id: data.userId, unitId: data.providerUnitId },
+      });
+      if (!user) {
+        throw new ForbiddenException('Beneficiário não pertence à unidade deste credenciado.');
+      }
+    }
+    return this.create(data);
+  }
 
   async create(data: {
     userId: string;
@@ -11,7 +30,6 @@ export class TransactionsService {
     serviceId: string;
     amountSaved: number;
   }) {
-    // Busca o serviço para pegar o amountSaved se não fornecido
     const service = await this.prisma.service.findUnique({ where: { id: data.serviceId } });
     const saved = data.amountSaved || Number(service?.originalPrice || 0) - Number(service?.discountedPrice || 0);
 
@@ -29,7 +47,7 @@ export class TransactionsService {
       },
     });
 
-    // Adiciona pontos ao usuário (1 ponto por R$1 economizado)
+    // 1 ponto por R$1 economizado
     const points = Math.floor(saved);
     if (points > 0) {
       await this.prisma.user.update({
