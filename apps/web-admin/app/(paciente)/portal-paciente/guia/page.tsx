@@ -17,7 +17,8 @@ export default async function GuiaMedicoPage() {
   if (!user || user.role !== 'patient') redirect('/login');
 
   const unitId = user.unitId ?? '';
-  const providers = await serverFetch<Provider[]>(`/providers?unitId=${unitId}`) ?? [];
+  const providersRes = await serverFetch<{ data: Provider[] }>(`/providers?unitId=${unitId}`);
+  const providers = providersRes?.data ?? [];
 
   function parseAddress(addr?: string) {
     if (!addr) return null;

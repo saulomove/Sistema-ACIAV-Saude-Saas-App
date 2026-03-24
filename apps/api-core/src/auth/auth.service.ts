@@ -1,6 +1,7 @@
 import { Injectable, UnauthorizedException, BadRequestException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
+import * as crypto from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -33,17 +34,20 @@ export class AuthService {
     };
 
     const token = this.jwtService.sign(payload);
+    const refreshToken = crypto.randomBytes(40).toString('hex');
 
     await this.prisma.session.create({
       data: {
         authUserId: authUser.id,
         token,
+        refreshToken,
         expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
       },
     });
 
     return {
       token,
+      refreshToken,
       user: {
         id: authUser.id,
         email: authUser.email,
@@ -59,6 +63,41 @@ export class AuthService {
   async logout(token: string) {
     await this.prisma.session.deleteMany({ where: { token } });
     return { message: 'Logout realizado com sucesso.' };
+  }
+
+  async refresh(refreshToken: string) {
+    const session = await this.prisma.session.findFirst({
+      where: { refreshToken, expiresAt: { gt: new Date() } },
+      include: { authUser: true },
+    });
+
+    if (!session || !session.authUser.status) {
+      throw new UnauthorizedException('Refresh token inválido ou expirado. Faça login novamente.');
+    }
+
+    const payload = {
+      sub: session.authUser.id,
+      email: session.authUser.email,
+      role: session.authUser.role,
+      unitId: session.authUser.unitId,
+      companyId: session.authUser.companyId,
+      providerId: session.authUser.providerId,
+      userId: session.authUser.userId,
+    };
+
+    const newToken = this.jwtService.sign(payload);
+    const newRefreshToken = crypto.randomBytes(40).toString('hex');
+
+    await this.prisma.session.update({
+      where: { id: session.id },
+      data: {
+        token: newToken,
+        refreshToken: newRefreshToken,
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      },
+    });
+
+    return { token: newToken, refreshToken: newRefreshToken };
   }
 
   async listAdminUsers(filters: { role?: string; unitId?: string }) {

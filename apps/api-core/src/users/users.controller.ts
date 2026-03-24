@@ -14,12 +14,14 @@ export class UsersController {
     @Query('companyId') companyId?: string,
     @Query('search') search?: string,
     @Query('type') type?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
   ) {
     // Usuários não-super_admin só podem ver dados da própria unidade
     const effectiveUnitId = req.user.role === 'super_admin' ? unitId : (req.user.unitId ?? unitId);
     // RH só pode ver usuários da própria empresa
     const effectiveCompanyId = req.user.role === 'rh' ? (req.user.companyId ?? companyId) : companyId;
-    return this.usersService.findAll(effectiveUnitId, effectiveCompanyId, search, type);
+    return this.usersService.findAll(effectiveUnitId, effectiveCompanyId, search, type, Number(page) || 1, Number(limit) || 50);
   }
 
   @Get('validate/:cpf')

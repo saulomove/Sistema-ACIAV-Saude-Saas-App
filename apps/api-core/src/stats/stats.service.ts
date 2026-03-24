@@ -102,32 +102,84 @@ export class StatsService {
     };
   }
 
+  async getBillingStats() {
+    const units = await this.prisma.unit.findMany({
+      where: { status: true },
+      include: {
+        _count: { select: { users: true, companies: true, providers: true } },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    const result = await Promise.all(
+      units.map(async (unit) => {
+        const [totalTransactions, economiaAgg] = await Promise.all([
+          this.prisma.transaction.count({ where: { user: { unitId: unit.id } } }),
+          this.prisma.transaction.aggregate({
+            where: { user: { unitId: unit.id } },
+            _sum: { amountSaved: true },
+          }),
+        ]);
+
+        const last30 = await this.prisma.transaction.count({
+          where: {
+            user: { unitId: unit.id },
+            createdAt: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) },
+          },
+        });
+
+        return {
+          id: unit.id,
+          name: unit.name,
+          subdomain: unit.subdomain,
+          vidas: unit._count.users,
+          empresas: unit._count.companies,
+          credenciados: unit._count.providers,
+          totalTransactions,
+          economiaTotal: Number(economiaAgg._sum.amountSaved || 0),
+          atendimentosUltimos30Dias: last30,
+        };
+      }),
+    );
+
+    const totalEconomia = result.reduce((s, u) => s + u.economiaTotal, 0);
+    const totalVidas = result.reduce((s, u) => s + u.vidas, 0);
+    const totalAtendimentos = result.reduce((s, u) => s + u.totalTransactions, 0);
+
+    return { units: result, totalEconomia, totalVidas, totalAtendimentos };
+  }
+
   private async getChartData(unitId?: string) {
-    const months = [];
     const now = new Date();
+    const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1);
     const unitFilter = unitId ? { user: { unitId } } : {};
 
+    const rows = await this.prisma.transaction.findMany({
+      where: { ...unitFilter, createdAt: { gte: sixMonthsAgo } },
+      select: { createdAt: true, amountSaved: true },
+    });
+
+    // Build month buckets in memory (1 query instead of 12)
+    const buckets: Record<string, { atendimentos: number; economia: number }> = {};
     for (let i = 5; i >= 0; i--) {
-      const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const nextDate = new Date(now.getFullYear(), now.getMonth() - i + 1, 1);
-
-      const [atendimentos, economiaAgg] = await Promise.all([
-        this.prisma.transaction.count({
-          where: { ...unitFilter, createdAt: { gte: date, lt: nextDate } },
-        }),
-        this.prisma.transaction.aggregate({
-          where: { ...unitFilter, createdAt: { gte: date, lt: nextDate } },
-          _sum: { amountSaved: true },
-        }),
-      ]);
-
-      months.push({
-        name: date.toLocaleDateString('pt-BR', { month: 'short' }),
-        atendimentos,
-        economia: Number(economiaAgg._sum.amountSaved || 0),
-      });
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const key = `${d.getFullYear()}-${d.getMonth()}`;
+      buckets[key] = { atendimentos: 0, economia: 0 };
     }
 
-    return months;
+    for (const row of rows) {
+      const d = new Date(row.createdAt);
+      const key = `${d.getFullYear()}-${d.getMonth()}`;
+      if (buckets[key]) {
+        buckets[key].atendimentos++;
+        buckets[key].economia += Number(row.amountSaved || 0);
+      }
+    }
+
+    return Object.entries(buckets).map(([key, val]) => {
+      const [year, month] = key.split('-').map(Number);
+      const label = new Date(year, month, 1).toLocaleDateString('pt-BR', { month: 'short' });
+      return { name: label, ...val };
+    });
   }
 }

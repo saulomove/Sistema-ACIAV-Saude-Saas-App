@@ -5,14 +5,14 @@ export default async function BeneficiariosPage() {
   const user = await getSessionUser();
   const unitId = user?.unitId ?? '';
 
-  const [users, companies] = await Promise.all([
-    serverFetch<unknown[]>(`/users?unitId=${unitId}`),
+  const [usersRes, companies] = await Promise.all([
+    serverFetch<{ data: unknown[] }>(`/users?unitId=${unitId}`),
     serverFetch<unknown[]>(`/companies?unitId=${unitId}`),
   ]);
 
   return (
     <BeneficiariosClient
-      users={users ?? []}
+      users={usersRes?.data ?? []}
       companies={companies ?? []}
       unitId={unitId}
     />

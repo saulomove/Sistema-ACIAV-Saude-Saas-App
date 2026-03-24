@@ -135,11 +135,12 @@ model AuthUser {
 }
 
 model Session {
-  id         String   @id @default(uuid())
-  authUserId String
-  token      String   @unique
-  expiresAt  DateTime
-  createdAt  DateTime @default(now())
+  id           String   @id @default(uuid())
+  authUserId   String
+  token        String   @unique
+  refreshToken String?  @unique
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
 
   authUser AuthUser @relation(fields: [authUserId], references: [id], onDelete: Cascade)
 }

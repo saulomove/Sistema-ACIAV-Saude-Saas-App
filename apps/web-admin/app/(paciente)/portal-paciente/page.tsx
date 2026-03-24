@@ -2,7 +2,8 @@ import { redirect } from 'next/navigation';
 import { getSessionUser, serverFetch } from '../../../lib/server-api';
 import Link from 'next/link';
 import Image from 'next/image';
-import { QrCode, ArrowRight, MapPin, HeartPulse, ShieldAlert, Star } from 'lucide-react';
+import { ArrowRight, MapPin, HeartPulse, ShieldAlert, Star } from 'lucide-react';
+import QrCodeImage from '../../../components/QrCodeImage';
 
 interface PatientCard {
   id: string;
@@ -85,7 +86,7 @@ export default async function PortalPacientePage() {
               )}
             </div>
             <div className="bg-white p-2.5 rounded-2xl shadow-md border border-gray-100">
-              <QrCode size={48} className="text-[#007178]" strokeWidth={1.5} />
+              <QrCodeImage value={card?.cpf ?? card?.id ?? 'aciav'} size={64} />
             </div>
           </div>
         </div>

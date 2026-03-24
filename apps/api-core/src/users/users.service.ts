@@ -5,25 +5,33 @@ import { PrismaService } from '../prisma/prisma.service';
 export class UsersService {
   constructor(private prisma: PrismaService) {}
 
-  async findAll(unitId?: string, companyId?: string, search?: string, type?: string) {
-    return this.prisma.user.findMany({
-      where: {
-        ...(unitId && { unitId }),
-        ...(companyId && { companyId }),
-        ...(type && { type }),
-        ...(search && {
-          OR: [
-            { fullName: { contains: search, mode: 'insensitive' } },
-            { cpf: { contains: search } },
-          ],
-        }),
-      },
-      include: {
-        company: { select: { corporateName: true } },
-        _count: { select: { dependents: true, transactions: true } },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+  async findAll(unitId?: string, companyId?: string, search?: string, type?: string, page = 1, limit = 50) {
+    const skip = (page - 1) * limit;
+    const where = {
+      ...(unitId && { unitId }),
+      ...(companyId && { companyId }),
+      ...(type && { type }),
+      ...(search && {
+        OR: [
+          { fullName: { contains: search, mode: 'insensitive' as const } },
+          { cpf: { contains: search } },
+        ],
+      }),
+    };
+    const [data, total] = await Promise.all([
+      this.prisma.user.findMany({
+        where,
+        include: {
+          company: { select: { corporateName: true } },
+          _count: { select: { dependents: true, transactions: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      this.prisma.user.count({ where }),
+    ]);
+    return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
   }
 
   async findOne(id: string) {

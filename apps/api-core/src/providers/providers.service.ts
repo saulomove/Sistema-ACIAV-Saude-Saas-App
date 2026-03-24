@@ -5,18 +5,24 @@ import { PrismaService } from '../prisma/prisma.service';
 export class ProvidersService {
   constructor(private prisma: PrismaService) {}
 
-  async findAll(unitId?: string, category?: string, search?: string) {
-    return this.prisma.provider.findMany({
-      where: {
-        ...(unitId && { unitId, status: true }),
-        ...(category && { category }),
-        ...(search && { name: { contains: search, mode: 'insensitive' } }),
-      },
-      include: {
-        _count: { select: { transactions: true, services: true } },
-      },
-      orderBy: { rankingScore: 'desc' },
-    });
+  async findAll(unitId?: string, category?: string, search?: string, page = 1, limit = 50) {
+    const skip = (page - 1) * limit;
+    const where = {
+      ...(unitId && { unitId, status: true }),
+      ...(category && { category }),
+      ...(search && { name: { contains: search, mode: 'insensitive' as const } }),
+    };
+    const [data, total] = await Promise.all([
+      this.prisma.provider.findMany({
+        where,
+        include: { _count: { select: { transactions: true, services: true } } },
+        orderBy: { rankingScore: 'desc' },
+        skip,
+        take: limit,
+      }),
+      this.prisma.provider.count({ where }),
+    ]);
+    return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
   }
 
   async findOne(id: string) {
@@ -52,6 +58,12 @@ export class ProvidersService {
     }));
   }
 
+  async remove(id: string) {
+    return this.prisma.provider.update({ where: { id }, data: { status: false } });
+  }
+
+  // ─── Services ───────────────────────────────────────────────────────────────
+
   async getServices(providerId: string) {
     return this.prisma.service.findMany({ where: { providerId } });
   }
@@ -68,7 +80,32 @@ export class ProvidersService {
     return this.prisma.service.delete({ where: { id: serviceId } });
   }
 
-  async remove(id: string) {
-    return this.prisma.provider.update({ where: { id }, data: { status: false } });
+  // ─── Rewards ────────────────────────────────────────────────────────────────
+
+  async getRewardsByUnit(unitId: string) {
+    return this.prisma.reward.findMany({
+      where: { provider: { unitId } },
+      include: { provider: { select: { id: true, name: true, category: true } } },
+      orderBy: { pointsRequired: 'asc' },
+    });
+  }
+
+  async getRewardsByProvider(providerId: string) {
+    return this.prisma.reward.findMany({
+      where: { providerId },
+      orderBy: { pointsRequired: 'asc' },
+    });
+  }
+
+  async createReward(providerId: string, data: { name: string; pointsRequired: number; stock: number }) {
+    return this.prisma.reward.create({ data: { providerId, ...data } });
+  }
+
+  async updateReward(rewardId: string, data: { name?: string; pointsRequired?: number; stock?: number }) {
+    return this.prisma.reward.update({ where: { id: rewardId }, data });
+  }
+
+  async deleteReward(rewardId: string) {
+    return this.prisma.reward.delete({ where: { id: rewardId } });
   }
 }

@@ -13,10 +13,11 @@ export class ProvidersController {
     @Query('unitId') unitId?: string,
     @Query('category') category?: string,
     @Query('search') search?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
   ) {
-    // Usuários não-super_admin só podem ver credenciados da própria unidade
     const effectiveUnitId = req.user.role === 'super_admin' ? unitId : (req.user.unitId ?? unitId);
-    return this.providersService.findAll(effectiveUnitId, category, search);
+    return this.providersService.findAll(effectiveUnitId, category, search, Number(page) || 1, Number(limit) || 50);
   }
 
   @Get('ranking')
@@ -51,6 +52,8 @@ export class ProvidersController {
     return this.providersService.remove(id);
   }
 
+  // ─── Services ───────────────────────────────────────────────────────────────
+
   @Get(':id/services')
   getServices(@Param('id') id: string) {
     return this.providersService.getServices(id);
@@ -69,5 +72,33 @@ export class ProvidersController {
   @Delete('services/:serviceId')
   deleteService(@Param('serviceId') serviceId: string) {
     return this.providersService.deleteService(serviceId);
+  }
+
+  // ─── Rewards ────────────────────────────────────────────────────────────────
+
+  @Get('rewards/by-unit')
+  getRewardsByUnit(@Req() req: any, @Query('unitId') unitId?: string) {
+    const effectiveUnitId = req.user.role === 'super_admin' ? unitId : (req.user.unitId ?? unitId);
+    return this.providersService.getRewardsByUnit(effectiveUnitId ?? '');
+  }
+
+  @Get(':id/rewards')
+  getRewardsByProvider(@Param('id') id: string) {
+    return this.providersService.getRewardsByProvider(id);
+  }
+
+  @Post(':id/rewards')
+  createReward(@Param('id') id: string, @Body() body: any) {
+    return this.providersService.createReward(id, body);
+  }
+
+  @Put('rewards/:rewardId')
+  updateReward(@Param('rewardId') rewardId: string, @Body() body: any) {
+    return this.providersService.updateReward(rewardId, body);
+  }
+
+  @Delete('rewards/:rewardId')
+  deleteReward(@Param('rewardId') rewardId: string) {
+    return this.providersService.deleteReward(rewardId);
   }
 }

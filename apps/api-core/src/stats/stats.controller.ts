@@ -26,4 +26,12 @@ export class StatsController {
   getCompany(@Query('companyId') companyId: string) {
     return this.statsService.getCompanyStats(companyId);
   }
+
+  @Get('billing')
+  getBilling(@Req() req: any) {
+    if (req.user?.role !== 'super_admin') {
+      throw new ForbiddenException('Acesso restrito ao Super Admin.');
+    }
+    return this.statsService.getBillingStats();
+  }
 }

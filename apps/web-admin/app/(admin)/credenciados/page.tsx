@@ -5,7 +5,8 @@ export default async function CredenciadosPage() {
   const user = await getSessionUser();
   const unitId = user?.unitId ?? '';
 
-  const providers = await serverFetch<unknown[]>(`/providers?unitId=${unitId}`);
+  const res = await serverFetch<{ data: unknown[] }>(`/providers?unitId=${unitId}`);
+  const providers = res?.data ?? [];
 
-  return <CredenciadosClient providers={providers ?? []} unitId={unitId} />;
+  return <CredenciadosClient providers={providers} unitId={unitId} />;
 }

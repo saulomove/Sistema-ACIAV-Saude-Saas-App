@@ -46,10 +46,14 @@ export default function ImportarClient({ companyId, unitId }: { companyId: strin
     const rows = [];
     for (let i = 1; i < lines.length; i++) {
       const [fullName, cpf] = lines[i].split(',').map((s) => s.trim().replace(/"/g, ''));
-      if (fullName && cpf) {
+      const cleanCpf = cpf.replace(/\D/g, '');
+      if (fullName && cleanCpf) {
+        if (cleanCpf.length !== 11) {
+          throw new Error(`Linha ${i + 1}: CPF "${cpf}" inválido — deve conter 11 dígitos.`);
+        }
         rows.push({
           fullName,
-          cpf: cpf.replace(/\D/g, ''),
+          cpf: cleanCpf,
           unitId,
           companyId,
           type: 'titular',

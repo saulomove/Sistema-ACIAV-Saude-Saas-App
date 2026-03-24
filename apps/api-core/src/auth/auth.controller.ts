@@ -13,6 +13,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
+import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 
 @Controller('auth')
@@ -21,8 +22,15 @@ export class AuthController {
 
   @Post('login')
   @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { ttl: 60000, limit: 5 } })
   async login(@Body() body: { email: string; password: string }) {
     return this.authService.login(body.email, body.password);
+  }
+
+  @Post('refresh')
+  @HttpCode(HttpStatus.OK)
+  async refresh(@Body() body: { refreshToken: string }) {
+    return this.authService.refresh(body.refreshToken);
   }
 
   @Post('logout')
