@@ -66,14 +66,8 @@ export default function LoginPage() {
 
         {/* Logo */}
         <div className="relative z-10">
-          <Image
-            src="/logo-aciav-saude.png"
-            alt="ACIAV Saúde"
-            width={192}
-            height={48}
-            className="object-contain brightness-0 invert"
-            priority
-          />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo-aciav-saude.png" alt="ACIAV Saúde" width={192} height={48} className="object-contain brightness-0 invert" />
         </div>
 
         {/* Conteúdo central */}
@@ -114,7 +108,8 @@ export default function LoginPage() {
         <div className="w-full max-w-sm">
           {/* Mobile logo */}
           <div className="flex lg:hidden justify-center mb-8">
-            <Image src="/logo-aciav-saude.png" alt="ACIAV Saúde" width={160} height={40} className="object-contain" priority />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo-aciav-saude.png" alt="ACIAV Saúde" width={160} height={40} className="object-contain" />
           </div>
 
           {/* Header */}
