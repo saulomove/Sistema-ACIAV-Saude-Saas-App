@@ -2,9 +2,10 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { CreditCard, Search, ActivitySquare, Gift, Settings, LogOut, Users } from 'lucide-react';
+import { CreditCard, Search, ActivitySquare, Gift, Settings, LogOut, Users, Menu, X } from 'lucide-react';
 import Image from 'next/image';
 import clsx from 'clsx';
+import { useState } from 'react';
 
 const menuItems = [
   { name: 'Minha Carteirinha', icon: CreditCard, href: '/portal-paciente' },
@@ -24,6 +25,7 @@ export default function SidebarPaciente({
 }) {
   const pathname = usePathname();
   const router = useRouter();
+  const [isOpen, setIsOpen] = useState(false);
 
   async function handleLogout() {
     await fetch('/internal/logout', { method: 'POST' });
@@ -31,7 +33,30 @@ export default function SidebarPaciente({
   }
 
   return (
-    <aside className="w-64 bg-slate-900 text-white flex flex-col min-h-screen sticky top-0 shadow-xl overflow-hidden relative z-20">
+    <>
+      {/* Mobile hamburger */}
+      <button
+        className="md:hidden fixed top-4 left-4 z-50 bg-white rounded-xl p-2 shadow-lg border border-gray-100"
+        onClick={() => setIsOpen(true)}
+        aria-label="Abrir menu"
+      >
+        <Menu size={20} className="text-slate-700" />
+      </button>
+
+      {/* Mobile overlay */}
+      {isOpen && (
+        <div
+          className="md:hidden fixed inset-0 bg-black/40 z-40"
+          onClick={() => setIsOpen(false)}
+        />
+      )}
+
+    <aside className={clsx(
+      'w-64 bg-slate-900 text-white flex flex-col min-h-screen shadow-xl overflow-hidden z-50',
+      'fixed inset-y-0 left-0 transition-transform duration-300',
+      'md:static md:translate-x-0 md:z-20 md:shrink-0',
+      isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
+    )}>
       <div className="absolute top-0 right-0 w-40 h-40 bg-[#007178] rounded-full blur-3xl -mr-20 -mt-20 opacity-30 pointer-events-none" />
 
       {/* Brand */}
@@ -40,6 +65,13 @@ export default function SidebarPaciente({
           <Image src="/logo-aciav-saude.png" alt="ACIAV Saúde" fill className="object-contain object-center" priority />
         </div>
         <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Portal do Paciente</p>
+        <button
+          className="md:hidden absolute right-3 top-3 p-1 text-slate-400 hover:text-slate-700"
+          onClick={() => setIsOpen(false)}
+          aria-label="Fechar menu"
+        >
+          <X size={18} />
+        </button>
       </div>
 
       {/* Patient info */}
@@ -83,5 +115,6 @@ export default function SidebarPaciente({
         </button>
       </div>
     </aside>
+    </>
   );
 }

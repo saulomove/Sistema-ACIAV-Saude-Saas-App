@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { getSessionUser, serverFetch } from '../../lib/server-api';
 import SidebarPaciente from '../../components/SidebarPaciente';
 import { Bell } from 'lucide-react';
+import Image from 'next/image';
 
 interface PatientCard {
   id: string;
@@ -15,7 +16,13 @@ function HeaderPaciente({ name, company }: { name: string; company: string }) {
   const initials = name.split(' ').slice(0, 2).map((n) => n[0]).join('').toUpperCase();
   return (
     <header className="h-20 bg-white border-b border-gray-100 flex items-center justify-between px-8 sticky top-0 z-10 shadow-sm">
-      <div>
+      {/* Mobile logo */}
+      <div className="md:hidden pl-10 flex items-center">
+        <div className="w-28 h-8 relative">
+          <Image src="/logo-aciav-saude.png" alt="ACIAV Saúde" fill className="object-contain object-left" priority />
+        </div>
+      </div>
+      <div className="hidden md:block">
         <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Portal do Paciente</p>
         {company && <p className="text-sm font-bold text-slate-600">{company}</p>}
       </div>

@@ -4,10 +4,11 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard, Users, Building, Stethoscope, FileText, Settings,
-  Award, LogOut, Globe, DollarSign, ShieldCheck, BarChart3,
+  Award, LogOut, Globe, DollarSign, ShieldCheck, BarChart3, Menu, X,
 } from 'lucide-react';
 import Image from 'next/image';
 import clsx from 'clsx';
+import { useState } from 'react';
 
 interface MenuItem { name: string; icon: React.ElementType; href: string; }
 
@@ -69,6 +70,7 @@ export default function Sidebar({
 }) {
   const pathname = usePathname();
   const router = useRouter();
+  const [isOpen, setIsOpen] = useState(false);
 
   async function handleLogout() {
     await fetch('/internal/logout', { method: 'POST' });
@@ -78,9 +80,32 @@ export default function Sidebar({
   const menuItems = getMenuItems(role);
 
   return (
-    <aside className="w-64 bg-white border-r border-gray-100 flex flex-col min-h-screen sticky top-0 shadow-sm overflow-hidden z-20">
+    <>
+      {/* Mobile hamburger */}
+      <button
+        className="md:hidden fixed top-4 left-4 z-50 bg-white rounded-xl p-2 shadow-lg border border-gray-100"
+        onClick={() => setIsOpen(true)}
+        aria-label="Abrir menu"
+      >
+        <Menu size={20} className="text-slate-700" />
+      </button>
+
+      {/* Mobile overlay */}
+      {isOpen && (
+        <div
+          className="md:hidden fixed inset-0 bg-black/40 z-40"
+          onClick={() => setIsOpen(false)}
+        />
+      )}
+
+    <aside className={clsx(
+      'w-64 bg-white border-r border-gray-100 flex flex-col min-h-screen shadow-sm overflow-hidden z-50',
+      'fixed inset-y-0 left-0 transition-transform duration-300',
+      'md:static md:translate-x-0 md:z-20 md:shrink-0',
+      isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
+    )}>
       {/* Brand */}
-      <div className="h-20 flex items-center justify-center border-b border-gray-100 bg-white">
+      <div className="h-20 flex items-center justify-center border-b border-gray-100 bg-white relative">
         <div className="w-40 relative h-12">
           <Image
             src="/logo-aciav-saude.png"
@@ -90,6 +115,13 @@ export default function Sidebar({
             priority
           />
         </div>
+        <button
+          className="md:hidden absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-700"
+          onClick={() => setIsOpen(false)}
+          aria-label="Fechar menu"
+        >
+          <X size={20} />
+        </button>
       </div>
 
       {/* Role Badge */}
@@ -150,5 +182,6 @@ export default function Sidebar({
         </button>
       </div>
     </aside>
+    </>
   );
 }

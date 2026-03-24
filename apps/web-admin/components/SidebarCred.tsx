@@ -2,9 +2,10 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Stethoscope, Clock, ShieldCheck, Gift, LogOut, Wrench } from 'lucide-react';
+import { Stethoscope, Clock, ShieldCheck, Gift, LogOut, Wrench, Menu, X } from 'lucide-react';
 import Image from 'next/image';
 import clsx from 'clsx';
+import { useState } from 'react';
 
 const menuItems = [
   { name: 'Atendimento', icon: ShieldCheck, href: '/portal-credenciado' },
@@ -24,6 +25,7 @@ export default function SidebarCred({
 }) {
   const pathname = usePathname();
   const router = useRouter();
+  const [isOpen, setIsOpen] = useState(false);
 
   async function handleLogout() {
     await fetch('/internal/logout', { method: 'POST' });
@@ -31,13 +33,43 @@ export default function SidebarCred({
   }
 
   return (
-    <aside className="w-64 bg-[#007178] text-white flex flex-col min-h-screen sticky top-0 shadow-xl overflow-hidden z-20">
+    <>
+      {/* Mobile hamburger */}
+      <button
+        className="md:hidden fixed top-4 left-4 z-50 bg-white rounded-xl p-2 shadow-lg border border-gray-100"
+        onClick={() => setIsOpen(true)}
+        aria-label="Abrir menu"
+      >
+        <Menu size={20} className="text-slate-700" />
+      </button>
+
+      {/* Mobile overlay */}
+      {isOpen && (
+        <div
+          className="md:hidden fixed inset-0 bg-black/40 z-40"
+          onClick={() => setIsOpen(false)}
+        />
+      )}
+
+    <aside className={clsx(
+      'w-64 bg-[#007178] text-white flex flex-col min-h-screen shadow-xl overflow-hidden z-50',
+      'fixed inset-y-0 left-0 transition-transform duration-300',
+      'md:static md:translate-x-0 md:z-20 md:shrink-0',
+      isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
+    )}>
       {/* Brand */}
-      <div className="h-24 flex flex-col items-center justify-center border-b border-gray-100 bg-white pt-4 pb-2 shrink-0">
+      <div className="h-24 flex flex-col items-center justify-center border-b border-gray-100 bg-white pt-4 pb-2 shrink-0 relative">
         <div className="w-40 relative h-10 mb-1">
           <Image src="/logo-aciav-saude.png" alt="ACIAV Saúde" fill className="object-contain object-center" priority />
         </div>
         <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Portal do Parceiro</p>
+        <button
+          className="md:hidden absolute right-3 top-3 p-1 text-slate-400 hover:text-slate-700"
+          onClick={() => setIsOpen(false)}
+          aria-label="Fechar menu"
+        >
+          <X size={18} />
+        </button>
       </div>
 
       {/* Provider info */}
@@ -77,5 +109,6 @@ export default function SidebarCred({
         </button>
       </div>
     </aside>
+    </>
   );
 }

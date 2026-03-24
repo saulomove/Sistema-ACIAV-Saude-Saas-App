@@ -1,4 +1,5 @@
 import { Bell, Search, Globe } from 'lucide-react';
+import Image from 'next/image';
 
 export default function Header({ role, unitName }: { role: string; unitName: string }) {
   const isSuperAdmin = role === 'super_admin';
@@ -6,6 +7,12 @@ export default function Header({ role, unitName }: { role: string; unitName: str
   return (
     <header className="h-16 bg-white border-b border-gray-100 flex items-center justify-between px-6 sticky top-0 z-10 shadow-sm">
       <div className="flex items-center gap-4 flex-1">
+        {/* Mobile logo — shown only on mobile (hamburger occupies left corner) */}
+        <div className="md:hidden pl-10 flex items-center">
+          <div className="w-28 h-8 relative">
+            <Image src="/logo-aciav-saude.png" alt="ACIAV Saúde" fill className="object-contain object-left" priority />
+          </div>
+        </div>
         <div className="relative w-full max-w-md hidden md:block">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={17} />
           <input
