@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, BadRequestException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
@@ -81,6 +81,9 @@ export class AuthService {
     companyId?: string;
     providerId?: string;
   }) {
+    if (data.password.length < 8 || !/\d/.test(data.password)) {
+      throw new BadRequestException('A senha deve ter no mínimo 8 caracteres e conter ao menos um número.');
+    }
     const existing = await this.prisma.authUser.findUnique({ where: { email: data.email } });
     if (existing) throw new Error('E-mail já cadastrado no sistema.');
 

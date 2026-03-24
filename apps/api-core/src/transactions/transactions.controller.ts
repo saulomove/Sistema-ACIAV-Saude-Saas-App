@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Query, UseGuards, Req, ForbiddenException } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Body, Query, Param, UseGuards, Req } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { TransactionsService } from './transactions.service';
 
@@ -39,6 +39,16 @@ export class TransactionsController {
   @Get('by-user')
   findByUser(@Query('userId') userId: string) {
     return this.transactionsService.findByUser(userId);
+  }
+
+  @Patch(':id/confirm')
+  confirm(@Param('id') id: string, @Req() req: any) {
+    return this.transactionsService.confirm(id, req.user.userId);
+  }
+
+  @Patch(':id/rating')
+  rate(@Param('id') id: string, @Req() req: any, @Body() body: { rating: number }) {
+    return this.transactionsService.rate(id, req.user.userId, body.rating);
   }
 
   @Get('by-unit')

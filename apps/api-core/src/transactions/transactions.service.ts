@@ -1,4 +1,4 @@
-import { Injectable, ForbiddenException } from '@nestjs/common';
+import { Injectable, ForbiddenException, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -86,6 +86,44 @@ export class TransactionsService {
       },
       orderBy: { createdAt: 'desc' },
     });
+  }
+
+  async confirm(transactionId: string, userId: string) {
+    const tx = await this.prisma.transaction.findUnique({ where: { id: transactionId } });
+    if (!tx) throw new NotFoundException('Transação não encontrada.');
+    if (tx.userId !== userId) throw new ForbiddenException('Você só pode confirmar seus próprios atendimentos.');
+    return this.prisma.transaction.update({
+      where: { id: transactionId },
+      data: { confirmedByUser: true },
+      select: { id: true, confirmedByUser: true },
+    });
+  }
+
+  async rate(transactionId: string, userId: string, rating: number) {
+    if (rating < 1 || rating > 5) throw new BadRequestException('Avaliação deve ser entre 1 e 5.');
+    const tx = await this.prisma.transaction.findUnique({ where: { id: transactionId } });
+    if (!tx) throw new NotFoundException('Transação não encontrada.');
+    if (tx.userId !== userId) throw new ForbiddenException('Você só pode avaliar seus próprios atendimentos.');
+
+    const updated = await this.prisma.transaction.update({
+      where: { id: transactionId },
+      data: { rating },
+      select: { id: true, rating: true, providerId: true },
+    });
+
+    // Recalcula rankingScore do credenciado com média das avaliações
+    const agg = await this.prisma.transaction.aggregate({
+      where: { providerId: tx.providerId, rating: { not: null } },
+      _avg: { rating: true },
+    });
+    if (agg._avg.rating !== null) {
+      await this.prisma.provider.update({
+        where: { id: tx.providerId },
+        data: { rankingScore: agg._avg.rating },
+      });
+    }
+
+    return updated;
   }
 
   async findByUnit(unitId: string, page = 1, limit = 50) {
