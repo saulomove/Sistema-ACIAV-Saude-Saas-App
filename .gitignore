@@ -5,3 +5,9 @@ dist/
 .next/
 build/
 *.db
+.DS_Store
+
+# PWA generated files (regenerated on build)
+**/public/sw.js
+**/public/swe-worker-*.js
+**/public/workbox-*.js
