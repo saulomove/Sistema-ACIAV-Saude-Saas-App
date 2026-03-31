@@ -5,7 +5,6 @@ import { usePathname, useRouter } from 'next/navigation';
 import { LayoutDashboard, Users, UserPlus, FileSpreadsheet, ActivitySquare, LogOut, Menu, X } from 'lucide-react';
 import Image from 'next/image';
 import clsx from 'clsx';
-import { api } from '../lib/api-client';
 import { useState } from 'react';
 
 const menuItems = [
@@ -22,7 +21,7 @@ export default function SidebarRH({ email, companyName }: { email: string; compa
   const [isOpen, setIsOpen] = useState(false);
 
   async function handleLogout() {
-    try { await api.post('/auth/logout', {}); } catch { /* ignore */ }
+    await fetch('/internal/logout', { method: 'POST' });
     router.push('/login');
   }
 

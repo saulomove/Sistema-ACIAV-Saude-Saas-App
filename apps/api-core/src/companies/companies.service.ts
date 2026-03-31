@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -31,7 +32,26 @@ export class CompaniesService {
   }
 
   async create(data: { unitId: string; corporateName: string; cnpj: string; adminEmail: string }) {
-    return this.prisma.company.create({ data });
+    const company = await this.prisma.company.create({ data });
+
+    // Auto-cria o AuthUser de RH vinculado à empresa
+    const tempPassword = Math.random().toString(36).slice(-8) + 'A1';
+    const passwordHash = await bcrypt.hash(tempPassword, 10);
+
+    const existingRh = await this.prisma.authUser.findUnique({ where: { email: data.adminEmail } });
+    if (!existingRh) {
+      await this.prisma.authUser.create({
+        data: {
+          email: data.adminEmail,
+          passwordHash,
+          role: 'rh',
+          unitId: company.unitId,
+          companyId: company.id,
+        },
+      });
+    }
+
+    return { ...company, tempPassword: existingRh ? null : tempPassword };
   }
 
   async update(id: string, data: { corporateName?: string; adminEmail?: string; status?: boolean }) {

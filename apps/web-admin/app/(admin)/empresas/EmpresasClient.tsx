@@ -41,6 +41,7 @@ export default function EmpresasClient({
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [tempPassword, setTempPassword] = useState<string | null>(null);
 
   const lista = (companies as Company[]).filter(
     (c) => !search || c.corporateName.toLowerCase().includes(search.toLowerCase()) || (c.cnpj ?? '').includes(search)
@@ -50,6 +51,7 @@ export default function EmpresasClient({
     setEditingId(null);
     setForm(EMPTY_FORM);
     setError('');
+    setTempPassword(null);
     setModalOpen(true);
   }
 
@@ -73,15 +75,21 @@ export default function EmpresasClient({
           corporateName: form.corporateName,
           adminEmail: form.adminEmail || undefined,
         });
+        setModalOpen(false);
       } else {
-        await api.post('/companies', {
+        const result = await api.post('/companies', {
           unitId,
           corporateName: form.corporateName,
           cnpj: form.cnpj.replace(/\D/g, ''),
           adminEmail: form.adminEmail || 'rh@empresa.com.br',
         });
+        const r = result as { tempPassword?: string } | null;
+        if (r?.tempPassword) {
+          setTempPassword(r.tempPassword);
+        } else {
+          setModalOpen(false);
+        }
       }
-      setModalOpen(false);
       startTransition(() => router.refresh());
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Erro ao salvar.');
@@ -239,61 +247,84 @@ export default function EmpresasClient({
       </div>
 
       {/* Modal */}
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editingId ? 'Editar Empresa' : 'Nova Empresa'}>
+      <Modal open={modalOpen} onClose={() => { setModalOpen(false); setTempPassword(null); }} title={editingId ? 'Editar Empresa' : 'Nova Empresa'}>
         <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-bold text-slate-700 mb-1.5">Razão Social *</label>
-            <input
-              type="text"
-              value={form.corporateName}
-              onChange={(e) => setForm({ ...form, corporateName: e.target.value })}
-              className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-slate-50"
-              placeholder="Razão Social da Empresa LTDA"
-            />
-          </div>
 
-          {!editingId && (
-            <div>
-              <label className="block text-sm font-bold text-slate-700 mb-1.5">CNPJ *</label>
-              <input
-                type="text"
-                value={form.cnpj}
-                onChange={(e) => setForm({ ...form, cnpj: e.target.value })}
-                className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-slate-50 font-mono"
-                placeholder="00.000.000/0001-00"
-                maxLength={18}
-              />
+          {tempPassword && (
+            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 space-y-2">
+              <p className="text-sm font-bold text-emerald-800">Empresa criada com sucesso!</p>
+              <p className="text-xs text-emerald-700">Acesso do RH criado automaticamente. Compartilhe as credenciais abaixo:</p>
+              <div className="bg-white border border-emerald-200 rounded-lg px-3 py-2 space-y-1">
+                <p className="text-xs text-slate-500">E-mail: <span className="font-bold text-slate-800">{form.adminEmail || 'rh@empresa.com.br'}</span></p>
+                <p className="text-xs text-slate-500">Senha temporária: <span className="font-bold font-mono text-slate-800">{tempPassword}</span></p>
+              </div>
+              <p className="text-xs text-amber-700 font-medium">Anote a senha — ela não será exibida novamente.</p>
+              <button
+                onClick={() => { setModalOpen(false); setTempPassword(null); }}
+                className="w-full bg-emerald-600 text-white py-2 rounded-lg text-sm font-bold hover:bg-emerald-700 transition-colors mt-2"
+              >
+                Entendido, fechar
+              </button>
             </div>
           )}
 
-          <div>
-            <label className="block text-sm font-bold text-slate-700 mb-1.5">E-mail do RH / Responsável</label>
-            <input
-              type="email"
-              value={form.adminEmail}
-              onChange={(e) => setForm({ ...form, adminEmail: e.target.value })}
-              className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-slate-50"
-              placeholder="rh@empresa.com.br"
-            />
-          </div>
+          {!tempPassword && (
+            <>
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-1.5">Razão Social *</label>
+                <input
+                  type="text"
+                  value={form.corporateName}
+                  onChange={(e) => setForm({ ...form, corporateName: e.target.value })}
+                  className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-slate-50"
+                  placeholder="Razão Social da Empresa LTDA"
+                />
+              </div>
 
-          {error && (
-            <p className="text-sm text-red-600 bg-red-50 border border-red-200 px-4 py-2.5 rounded-lg">{error}</p>
+              {!editingId && (
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1.5">CNPJ *</label>
+                  <input
+                    type="text"
+                    value={form.cnpj}
+                    onChange={(e) => setForm({ ...form, cnpj: e.target.value })}
+                    className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-slate-50 font-mono"
+                    placeholder="00.000.000/0001-00"
+                    maxLength={18}
+                  />
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-1.5">E-mail do RH / Responsável</label>
+                <input
+                  type="email"
+                  value={form.adminEmail}
+                  onChange={(e) => setForm({ ...form, adminEmail: e.target.value })}
+                  className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-slate-50"
+                  placeholder="rh@empresa.com.br"
+                />
+              </div>
+
+              {error && (
+                <p className="text-sm text-red-600 bg-red-50 border border-red-200 px-4 py-2.5 rounded-lg">{error}</p>
+              )}
+
+              <div className="flex gap-3 pt-2">
+                <button onClick={() => { setModalOpen(false); setTempPassword(null); }} className="flex-1 border border-gray-200 text-slate-700 py-2.5 rounded-xl font-medium hover:bg-slate-50 transition-colors">
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleSave}
+                  disabled={saving}
+                  className="flex-1 bg-primary text-white py-2.5 rounded-xl font-medium hover:bg-primary-dark transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {saving && <Loader2 size={16} className="animate-spin" />}
+                  {saving ? 'Salvando...' : editingId ? 'Salvar Alterações' : 'Cadastrar'}
+                </button>
+              </div>
+            </>
           )}
-
-          <div className="flex gap-3 pt-2">
-            <button onClick={() => setModalOpen(false)} className="flex-1 border border-gray-200 text-slate-700 py-2.5 rounded-xl font-medium hover:bg-slate-50 transition-colors">
-              Cancelar
-            </button>
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className="flex-1 bg-primary text-white py-2.5 rounded-xl font-medium hover:bg-primary-dark transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-            >
-              {saving && <Loader2 size={16} className="animate-spin" />}
-              {saving ? 'Salvando...' : editingId ? 'Salvar Alterações' : 'Cadastrar'}
-            </button>
-          </div>
         </div>
       </Modal>
     </div>
