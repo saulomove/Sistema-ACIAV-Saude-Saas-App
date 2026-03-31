@@ -6,13 +6,13 @@ export default async function ColaboradoresPage() {
   const user = await getSessionUser();
   if (!user || user.role !== 'rh') redirect('/login');
 
-  const colaboradores = user.companyId
-    ? await serverFetch<unknown[]>(`/users?companyId=${user.companyId}&type=titular`)
-    : [];
+  const result = user.companyId
+    ? await serverFetch<{ data: unknown[] }>(`/users?companyId=${user.companyId}&type=titular`)
+    : null;
 
   return (
     <ColaboradoresRHClient
-      colaboradores={colaboradores ?? []}
+      colaboradores={result?.data ?? []}
       companyId={user.companyId ?? ''}
       unitId={user.unitId ?? ''}
     />
