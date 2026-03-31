@@ -15,11 +15,11 @@ export default async function DependentesPage() {
   const user = await getSessionUser();
   if (!user || user.role !== 'rh') redirect('/login');
 
-  const dependentes = await serverFetch<Dependente[]>(
-    `/users?companyId=${user.companyId}&type=dependente`,
-  );
+  const result = user.companyId
+    ? await serverFetch<{ data: Dependente[] }>(`/users?companyId=${user.companyId}&type=dependente`)
+    : null;
 
-  const lista = dependentes ?? [];
+  const lista = result?.data ?? [];
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
