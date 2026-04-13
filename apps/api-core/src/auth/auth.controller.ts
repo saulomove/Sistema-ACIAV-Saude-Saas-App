@@ -84,6 +84,17 @@ export class AuthController {
     return this.authService.createAdminUser(body);
   }
 
+  @Post('reset-password/provider/:providerId')
+  @UseGuards(AuthGuard('jwt'))
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { ttl: 60000, limit: 3 } })
+  async resetProviderPassword(@Req() req: any, @Param('providerId') providerId: string) {
+    if (!['super_admin', 'admin_unit'].includes(req.user?.role)) {
+      throw new ForbiddenException('Acesso restrito a administradores.');
+    }
+    return this.authService.resetPasswordByProvider(providerId);
+  }
+
   @Patch('admin-users/:id/status')
   @UseGuards(AuthGuard('jwt'))
   toggleStatus(@Req() req: any, @Param('id') id: string, @Body() body: { status: boolean }) {

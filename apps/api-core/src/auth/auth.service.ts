@@ -157,6 +157,27 @@ export class AuthService {
     return { message: 'Senha alterada com sucesso.' };
   }
 
+  async resetPassword(authUserId: string) {
+    const authUser = await this.prisma.authUser.findUnique({ where: { id: authUserId } });
+    if (!authUser) throw new BadRequestException('Usuário não encontrado.');
+
+    const tempPassword = crypto.randomBytes(6).toString('base64url').slice(0, 10) + 'A1';
+    const passwordHash = await bcrypt.hash(tempPassword, 10);
+
+    await this.prisma.authUser.update({ where: { id: authUserId }, data: { passwordHash } });
+
+    // Invalida todas as sessões do usuário para forçar novo login
+    await this.prisma.session.deleteMany({ where: { authUserId } });
+
+    return { tempPassword, email: authUser.email };
+  }
+
+  async resetPasswordByProvider(providerId: string) {
+    const authUser = await this.prisma.authUser.findFirst({ where: { providerId } });
+    if (!authUser) throw new BadRequestException('Credenciado não possui login cadastrado.');
+    return this.resetPassword(authUser.id);
+  }
+
   async me(authUserId: string) {
     const authUser = await this.prisma.authUser.findUnique({
       where: { id: authUserId },

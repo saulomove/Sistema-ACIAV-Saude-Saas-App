@@ -138,6 +138,10 @@ export default function CredenciadosClient({
   // Photo upload
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
+  // Reset password
+  const [resettingPassword, setResettingPassword] = useState(false);
+  const [resetResult, setResetResult] = useState<{ tempPassword: string; email: string } | null>(null);
+
   // Copied feedback
   const [copied, setCopied] = useState(false);
 
@@ -177,6 +181,7 @@ export default function CredenciadosClient({
     setDrawerTab('perfil');
     setServices([]);
     setServiceModalOpen(false);
+    setResetResult(null);
   }
 
   function closeDrawer() {
@@ -210,6 +215,20 @@ export default function CredenciadosClient({
       alert('Erro ao enviar foto. Use JPG, PNG ou WebP até 2MB.');
     } finally {
       setUploadingPhoto(false);
+    }
+  }
+
+  async function handleResetPassword(providerId: string) {
+    if (!confirm('Resetar a senha deste credenciado? Todas as sessões ativas serão encerradas.')) return;
+    setResettingPassword(true);
+    setResetResult(null);
+    try {
+      const result = await api.post(`/auth/reset-password/provider/${providerId}`, {}) as { tempPassword: string; email: string };
+      setResetResult(result);
+    } catch {
+      alert('Erro ao resetar senha. Verifique se o credenciado possui login cadastrado.');
+    } finally {
+      setResettingPassword(false);
     }
   }
 
@@ -708,7 +727,37 @@ export default function CredenciadosClient({
                           <p className="text-xs text-blue-600 font-bold uppercase tracking-wide flex items-center gap-1"><Key size={12} /> Login do Credenciado</p>
                           <p className="text-sm text-blue-800 font-medium mt-0.5">{drawerProvider.email}</p>
                         </div>
+                        <button
+                          onClick={() => handleResetPassword(drawerProvider.id)}
+                          disabled={resettingPassword}
+                          className="text-xs font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1.5 shrink-0"
+                        >
+                          {resettingPassword ? <Loader2 size={12} className="animate-spin" /> : <Key size={12} />}
+                          {resettingPassword ? 'Resetando...' : 'Resetar Senha'}
+                        </button>
                       </div>
+                    </div>
+                  )}
+
+                  {/* Reset password result */}
+                  {resetResult && (
+                    <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 space-y-3">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 size={18} className="text-emerald-600" />
+                        <p className="text-sm font-bold text-emerald-800">Nova senha temporária gerada!</p>
+                      </div>
+                      <p className="text-xs text-emerald-700">Compartilhe as credenciais abaixo com o credenciado. No próximo acesso ele poderá trocar a senha.</p>
+                      <div className="bg-white border border-emerald-200 rounded-lg px-4 py-3 space-y-1">
+                        <p className="text-xs text-slate-500">Login: <span className="font-bold text-slate-800">{resetResult.email}</span></p>
+                        <p className="text-xs text-slate-500">Senha temporária: <span className="font-bold font-mono text-slate-800">{resetResult.tempPassword}</span></p>
+                      </div>
+                      <button
+                        onClick={() => { copyCredentials(resetResult.email, resetResult.tempPassword); }}
+                        className="w-full bg-emerald-600 text-white py-2 rounded-lg text-sm font-bold hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2"
+                      >
+                        <Copy size={14} /> {copied ? 'Copiado!' : 'Copiar Credenciais'}
+                      </button>
+                      <p className="text-xs text-amber-700 font-medium">Anote a senha — ela não será exibida novamente.</p>
                     </div>
                   )}
 
