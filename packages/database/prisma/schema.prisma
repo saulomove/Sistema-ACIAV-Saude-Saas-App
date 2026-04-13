@@ -73,8 +73,6 @@ model Provider {
   phone            String?
   whatsapp         String?
   email            String?
-  discountType     String   @default("fixed") // "fixed" ou "percentage"
-  discountValue    Decimal  @default(0)
   photoUrl         String?
   rankingScore     Float    @default(0.0)
   bio              String?
@@ -95,6 +93,8 @@ model Service {
   originalPrice   Decimal  @default(0.0)
   insurancePrice  Decimal  @default(0.0)
   discountedPrice Decimal  @default(0.0)
+  discountType    String   @default("fixed") // "fixed" ou "percentage"
+  discountValue   Decimal  @default(0)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 

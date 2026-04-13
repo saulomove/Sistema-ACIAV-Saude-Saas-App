@@ -8,6 +8,8 @@ interface Service {
   originalPrice: number;
   insurancePrice: number;
   discountedPrice: number;
+  discountType: string;
+  discountValue: number;
 }
 
 export default async function ServicosPage() {

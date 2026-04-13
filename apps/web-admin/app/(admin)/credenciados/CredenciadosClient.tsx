@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import {
   Stethoscope, Plus, Search, Pencil, Trash2, Star, Loader2, X,
   MapPin, FileText, Wrench, ChevronRight, Save, AlertCircle,
-  CheckCircle2, Building2, Phone, Copy, Key,
+  CheckCircle2, Building2, Phone, Copy, Key, Camera, ImageIcon,
 } from 'lucide-react';
 import Modal from '../../../components/Modal';
 import { api } from '../../../lib/api-client';
@@ -16,6 +16,8 @@ interface Service {
   originalPrice: number;
   insurancePrice: number;
   discountedPrice: number;
+  discountType: string;
+  discountValue: number;
 }
 
 interface Provider {
@@ -31,8 +33,6 @@ interface Provider {
   phone?: string | null;
   whatsapp?: string | null;
   email?: string | null;
-  discountType?: string | null;
-  discountValue?: number | null;
   photoUrl?: string | null;
   rankingScore: number;
   bio?: string | null;
@@ -61,10 +61,10 @@ const CATEGORY_STYLE: Record<string, string> = {
 const EMPTY_FORM = {
   professionalName: '', clinicName: '', registration: '', cpfCnpj: '',
   category: 'Consultas', specialty: '', address: '', phone: '', whatsapp: '',
-  email: '', discountType: 'fixed', discountValue: '', bio: '',
+  email: '', bio: '',
 };
 
-const EMPTY_SERVICE_FORM = { description: '', originalPrice: '', insurancePrice: '', discountedPrice: '' };
+const EMPTY_SERVICE_FORM = { description: '', originalPrice: '', insurancePrice: '', discountedPrice: '', discountType: 'fixed', discountValue: '' };
 
 function fmtMoney(v: number) {
   return Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -135,6 +135,9 @@ export default function CredenciadosClient({
   const [serviceToast, setServiceToast] = useState('');
   const [serviceToastType, setServiceToastType] = useState<'ok' | 'err'>('ok');
 
+  // Photo upload
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+
   // Copied feedback
   const [copied, setCopied] = useState(false);
 
@@ -188,6 +191,28 @@ export default function CredenciadosClient({
     setTimeout(() => setCopied(false), 2500);
   }
 
+  async function handleUploadPhoto(providerId: string, file: File) {
+    setUploadingPhoto(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await fetch('/internal/api/providers/' + providerId + '/photo', {
+        method: 'POST',
+        body: formData,
+      });
+      if (!res.ok) throw new Error('Erro no upload');
+      const data = await res.json();
+      if (drawerProvider) {
+        setDrawerProvider({ ...drawerProvider, photoUrl: data.photoUrl });
+      }
+      startTransition(() => router.refresh());
+    } catch {
+      alert('Erro ao enviar foto. Use JPG, PNG ou WebP até 2MB.');
+    } finally {
+      setUploadingPhoto(false);
+    }
+  }
+
   // ── Provider CRUD ──────────────────────────────────────────────────────────
 
   function openCreate() {
@@ -212,8 +237,6 @@ export default function CredenciadosClient({
       phone: p.phone ?? '',
       whatsapp: p.whatsapp ?? '',
       email: p.email ?? '',
-      discountType: p.discountType ?? 'fixed',
-      discountValue: p.discountValue ? String(p.discountValue) : '',
       bio: p.bio ?? '',
     });
     setError('');
@@ -246,8 +269,6 @@ export default function CredenciadosClient({
         phone: form.phone.replace(/\D/g, '') || undefined,
         whatsapp: form.whatsapp.replace(/\D/g, '') || undefined,
         email: form.email.trim() || undefined,
-        discountType: form.discountType,
-        discountValue: form.discountValue ? parseFloat(form.discountValue) : 0,
         bio: form.bio.trim() || undefined,
       };
 
@@ -314,6 +335,8 @@ export default function CredenciadosClient({
       originalPrice: String(s.originalPrice),
       insurancePrice: String(s.insurancePrice ?? 0),
       discountedPrice: String(s.discountedPrice),
+      discountType: s.discountType ?? 'fixed',
+      discountValue: s.discountValue ? String(s.discountValue) : '',
     });
     setServiceFormError('');
     setServiceModalOpen(true);
@@ -331,12 +354,15 @@ export default function CredenciadosClient({
     setSavingService(true);
     setServiceFormError('');
     try {
+      const discVal = parseFloat(serviceForm.discountValue.replace(',', '.') || '0');
       if (editingService) {
         const updated = await api.put(`/providers/services/${editingService.id}`, {
           description: serviceForm.description,
           originalPrice: orig,
           insurancePrice: isNaN(ins) ? 0 : ins,
           discountedPrice: disc,
+          discountType: serviceForm.discountType,
+          discountValue: isNaN(discVal) ? 0 : discVal,
         }) as Service;
         setServices((prev) => prev.map((s) => (s.id === editingService.id ? updated : s)));
         showServiceToast('Serviço atualizado!');
@@ -346,6 +372,8 @@ export default function CredenciadosClient({
           originalPrice: orig,
           insurancePrice: isNaN(ins) ? 0 : ins,
           discountedPrice: disc,
+          discountType: serviceForm.discountType,
+          discountValue: isNaN(discVal) ? 0 : discVal,
         }) as Service;
         setServices((prev) => [...prev, created]);
         showServiceToast('Serviço cadastrado!');
@@ -519,9 +547,13 @@ export default function CredenciadosClient({
             {/* Drawer header */}
             <div className="flex items-start justify-between p-6 border-b border-gray-100 bg-slate-50 shrink-0">
               <div className="flex items-center gap-3">
-                <div className={`p-2.5 rounded-xl ${CATEGORY_STYLE[drawerProvider.category] ?? 'bg-slate-100 text-slate-600'}`}>
-                  <Building2 size={20} />
-                </div>
+                {drawerProvider.photoUrl ? (
+                  <img src={drawerProvider.photoUrl} alt="" className="w-11 h-11 rounded-xl object-cover" />
+                ) : (
+                  <div className={`p-2.5 rounded-xl ${CATEGORY_STYLE[drawerProvider.category] ?? 'bg-slate-100 text-slate-600'}`}>
+                    <Building2 size={20} />
+                  </div>
+                )}
                 <div>
                   <h2 className="font-bold text-slate-800 text-lg leading-tight">{drawerProvider.name}</h2>
                   <div className="flex items-center gap-2 mt-0.5">
@@ -635,6 +667,39 @@ export default function CredenciadosClient({
                     )}
                   </div>
 
+                  {/* Foto / Logo */}
+                  <div className="bg-slate-50 rounded-xl p-4">
+                    <p className="text-xs text-slate-400 font-bold uppercase tracking-wide mb-3">Foto / Logomarca</p>
+                    <div className="flex items-center gap-4">
+                      <div className="w-20 h-20 rounded-xl bg-white border-2 border-dashed border-gray-200 flex items-center justify-center overflow-hidden shrink-0">
+                        {drawerProvider.photoUrl ? (
+                          <img src={drawerProvider.photoUrl} alt="Foto" className="w-full h-full object-cover rounded-xl" />
+                        ) : (
+                          <ImageIcon size={28} className="text-slate-300" />
+                        )}
+                      </div>
+                      <div className="flex-1 space-y-2">
+                        <label className="block">
+                          <input
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) handleUploadPhoto(drawerProvider.id, file);
+                              e.target.value = '';
+                            }}
+                          />
+                          <span className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold cursor-pointer transition-colors ${uploadingPhoto ? 'bg-gray-100 text-gray-400' : 'bg-primary/10 text-primary hover:bg-primary/20'}`}>
+                            {uploadingPhoto ? <Loader2 size={14} className="animate-spin" /> : <Camera size={14} />}
+                            {uploadingPhoto ? 'Enviando...' : 'Enviar Foto'}
+                          </span>
+                        </label>
+                        <p className="text-xs text-slate-400">JPG, PNG ou WebP. Tamanho ideal: <strong>400x400px</strong>. Máximo: 2MB.</p>
+                      </div>
+                    </div>
+                  </div>
+
                   {/* Login info */}
                   {drawerProvider.email && (
                     <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3">
@@ -711,6 +776,9 @@ export default function CredenciadosClient({
                               <span className="text-sm font-bold text-[#007178]">{fmtMoney(s.discountedPrice)}</span>
                               <span className="bg-emerald-100 text-emerald-700 text-xs font-bold px-2 py-0.5 rounded-full">
                                 -{discountPct(s.originalPrice, s.discountedPrice)}%
+                              </span>
+                              <span className="bg-slate-100 text-slate-500 text-xs px-2 py-0.5 rounded-full">
+                                {s.discountType === 'percentage' ? 'Percentual' : 'Valor Fixo'}
                               </span>
                             </div>
                           </div>
@@ -799,6 +867,31 @@ export default function CredenciadosClient({
                     className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-slate-50 text-sm"
                   />
                 </div>
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-1.5">Tipo de Desconto</label>
+                <div className="flex gap-3">
+                  <label className={`flex-1 flex items-center gap-2 p-2.5 rounded-xl border-2 cursor-pointer transition-all text-sm ${serviceForm.discountType === 'fixed' ? 'border-primary bg-primary/5' : 'border-gray-200 hover:border-primary/40'}`}>
+                    <input type="radio" name="svcDiscountType" value="fixed" checked={serviceForm.discountType === 'fixed'} onChange={(e) => setServiceForm((f) => ({ ...f, discountType: e.target.value }))} className="accent-primary" />
+                    <span className="font-medium text-slate-700">Valor Fixo (R$)</span>
+                  </label>
+                  <label className={`flex-1 flex items-center gap-2 p-2.5 rounded-xl border-2 cursor-pointer transition-all text-sm ${serviceForm.discountType === 'percentage' ? 'border-primary bg-primary/5' : 'border-gray-200 hover:border-primary/40'}`}>
+                    <input type="radio" name="svcDiscountType" value="percentage" checked={serviceForm.discountType === 'percentage'} onChange={(e) => setServiceForm((f) => ({ ...f, discountType: e.target.value }))} className="accent-primary" />
+                    <span className="font-medium text-slate-700">Percentual (%)</span>
+                  </label>
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                  {serviceForm.discountType === 'percentage' ? 'Percentual de Desconto (%)' : 'Valor do Desconto (R$)'}
+                </label>
+                <input
+                  type="number" step="0.01" min="0"
+                  value={serviceForm.discountValue}
+                  onChange={(e) => setServiceForm((f) => ({ ...f, discountValue: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-slate-50 text-sm"
+                  placeholder={serviceForm.discountType === 'percentage' ? 'Ex: 30' : 'Ex: 50.00'}
+                />
               </div>
               {serviceForm.originalPrice && serviceForm.discountedPrice && (
                 <div className="bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-3 text-sm text-emerald-700">
@@ -986,11 +1079,11 @@ export default function CredenciadosClient({
                 </div>
               </div>
 
-              {/* Seção 3: Categoria e Desconto */}
+              {/* Seção 3: Categoria e Informações */}
               <div className="space-y-3">
                 <div className="flex items-center gap-2 pb-1 border-b border-gray-100">
                   <div className="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-black">3</div>
-                  <h3 className="text-sm font-bold text-slate-700">Categoria e Desconto Padrão</h3>
+                  <h3 className="text-sm font-bold text-slate-700">Categoria e Informações</h3>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
@@ -1017,34 +1110,6 @@ export default function CredenciadosClient({
                 </div>
 
                 <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-1">Tipo de Desconto</label>
-                  <p className="text-xs text-slate-400 mb-2">Define como o desconto será aplicado nos serviços</p>
-                  <div className="flex gap-3">
-                    <label className={`flex-1 flex items-center gap-2 p-3 rounded-xl border-2 cursor-pointer transition-all ${form.discountType === 'fixed' ? 'border-primary bg-primary/5' : 'border-gray-200 hover:border-primary/40'}`}>
-                      <input type="radio" name="discountType" value="fixed" checked={form.discountType === 'fixed'} onChange={(e) => setForm({ ...form, discountType: e.target.value })} className="accent-primary" />
-                      <span className="text-sm font-medium text-slate-700">Valor Fixo (R$)</span>
-                    </label>
-                    <label className={`flex-1 flex items-center gap-2 p-3 rounded-xl border-2 cursor-pointer transition-all ${form.discountType === 'percentage' ? 'border-primary bg-primary/5' : 'border-gray-200 hover:border-primary/40'}`}>
-                      <input type="radio" name="discountType" value="percentage" checked={form.discountType === 'percentage'} onChange={(e) => setForm({ ...form, discountType: e.target.value })} className="accent-primary" />
-                      <span className="text-sm font-medium text-slate-700">Percentual (%)</span>
-                    </label>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-1.5">
-                    {form.discountType === 'percentage' ? 'Percentual de Desconto (%)' : 'Valor do Desconto (R$)'}
-                  </label>
-                  <input
-                    type="number" step="0.01" min="0"
-                    value={form.discountValue}
-                    onChange={(e) => setForm({ ...form, discountValue: e.target.value })}
-                    className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-slate-50"
-                    placeholder={form.discountType === 'percentage' ? 'Ex: 30' : 'Ex: 50.00'}
-                  />
-                </div>
-
-                <div>
                   <label className="block text-sm font-bold text-slate-700 mb-1.5">Descrição / Bio</label>
                   <textarea
                     value={form.bio}
@@ -1053,6 +1118,10 @@ export default function CredenciadosClient({
                     className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-slate-50 resize-none"
                     placeholder="Especialidades, diferenciais, informações relevantes..."
                   />
+                </div>
+
+                <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 text-xs text-blue-700">
+                  <strong>Dica:</strong> Os descontos e valores são configurados individualmente em cada serviço, na aba &quot;Serviços&quot; do credenciado.
                 </div>
               </div>
 

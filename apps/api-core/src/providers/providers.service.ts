@@ -54,11 +54,8 @@ export class ProvidersService {
     phone?: string;
     whatsapp?: string;
     email?: string;
-    discountType?: string;
-    discountValue?: number;
     bio?: string;
   }) {
-    // name = clinicName se existir, senão professionalName
     const displayName = data.clinicName?.trim() || data.professionalName?.trim() || data.name;
 
     const provider = await this.prisma.provider.create({
@@ -75,8 +72,6 @@ export class ProvidersService {
         phone: data.phone,
         whatsapp: data.whatsapp,
         email: data.email,
-        discountType: data.discountType ?? 'fixed',
-        discountValue: data.discountValue ?? 0,
         bio: data.bio,
       },
     });
@@ -157,7 +152,14 @@ export class ProvidersService {
     return this.prisma.service.findMany({ where: { providerId } });
   }
 
-  async createService(providerId: string, data: { description: string; originalPrice: number; insurancePrice?: number; discountedPrice: number }) {
+  async createService(providerId: string, data: {
+    description: string;
+    originalPrice: number;
+    insurancePrice?: number;
+    discountedPrice: number;
+    discountType?: string;
+    discountValue?: number;
+  }) {
     return this.prisma.service.create({
       data: {
         providerId,
@@ -165,12 +167,28 @@ export class ProvidersService {
         originalPrice: data.originalPrice,
         insurancePrice: data.insurancePrice ?? 0,
         discountedPrice: data.discountedPrice,
+        discountType: data.discountType ?? 'fixed',
+        discountValue: data.discountValue ?? 0,
       },
     });
   }
 
-  async updateService(serviceId: string, data: { description?: string; originalPrice?: number; insurancePrice?: number; discountedPrice?: number }) {
-    return this.prisma.service.update({ where: { id: serviceId }, data });
+  async updateService(serviceId: string, data: {
+    description?: string;
+    originalPrice?: number;
+    insurancePrice?: number;
+    discountedPrice?: number;
+    discountType?: string;
+    discountValue?: number;
+  }) {
+    const allowed: any = {};
+    if (data.description !== undefined) allowed.description = data.description;
+    if (data.originalPrice !== undefined) allowed.originalPrice = data.originalPrice;
+    if (data.insurancePrice !== undefined) allowed.insurancePrice = data.insurancePrice;
+    if (data.discountedPrice !== undefined) allowed.discountedPrice = data.discountedPrice;
+    if (data.discountType !== undefined) allowed.discountType = data.discountType;
+    if (data.discountValue !== undefined) allowed.discountValue = data.discountValue;
+    return this.prisma.service.update({ where: { id: serviceId }, data: allowed });
   }
 
   async deleteService(serviceId: string) {

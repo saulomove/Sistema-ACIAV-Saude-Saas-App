@@ -1,6 +1,22 @@
-import { Controller, Get, Post, Put, Delete, Patch, Param, Body, Query, UseGuards, Req, ForbiddenException } from '@nestjs/common';
+import {
+  Controller, Get, Post, Put, Delete, Patch, Param, Body, Query,
+  UseGuards, Req, ForbiddenException, UseInterceptors, UploadedFile,
+  BadRequestException,
+} from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
+import * as path from 'path';
+import * as crypto from 'crypto';
 import { ProvidersService } from './providers.service';
+
+const uploadStorage = diskStorage({
+  destination: path.join(process.cwd(), 'uploads', 'providers'),
+  filename: (_req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    cb(null, `${crypto.randomBytes(16).toString('hex')}${ext}`);
+  },
+});
 
 @Controller('providers')
 @UseGuards(AuthGuard('jwt'))
@@ -56,9 +72,6 @@ export class ProvidersController {
       whatsapp: body.whatsapp,
       email: body.email,
       bio: body.bio,
-      discountType: body.discountType,
-      discountValue: body.discountValue,
-      photoUrl: body.photoUrl,
     };
     return this.providersService.create(data);
   }
@@ -66,7 +79,7 @@ export class ProvidersController {
   @Put(':id')
   async update(@Req() req: any, @Param('id') id: string, @Body() body: any) {
     await this.assertTenant(req, id);
-    const allowed = ['professionalName', 'clinicName', 'registration', 'cpfCnpj', 'category', 'specialty', 'address', 'phone', 'whatsapp', 'email', 'bio', 'discountType', 'discountValue', 'photoUrl', 'status'];
+    const allowed = ['professionalName', 'clinicName', 'registration', 'cpfCnpj', 'category', 'specialty', 'address', 'phone', 'whatsapp', 'email', 'bio', 'photoUrl', 'status'];
     const data: any = {};
     for (const key of allowed) {
       if (body[key] !== undefined) data[key] = body[key];
@@ -86,6 +99,27 @@ export class ProvidersController {
     return this.providersService.remove(id);
   }
 
+  // ─── Upload foto/logo ──────────────────────────────────────────────────────
+
+  @Post(':id/photo')
+  @UseInterceptors(FileInterceptor('file', {
+    storage: uploadStorage,
+    limits: { fileSize: 2 * 1024 * 1024 }, // 2MB max
+    fileFilter: (_req, file, cb) => {
+      const allowed = ['.jpg', '.jpeg', '.png', '.webp'];
+      const ext = path.extname(file.originalname).toLowerCase();
+      if (allowed.includes(ext)) cb(null, true);
+      else cb(new BadRequestException('Formato inválido. Use JPG, PNG ou WebP.'), false);
+    },
+  }))
+  async uploadPhoto(@Req() req: any, @Param('id') id: string, @UploadedFile() file: Express.Multer.File) {
+    await this.assertTenant(req, id);
+    if (!file) throw new BadRequestException('Nenhum arquivo enviado.');
+    const photoUrl = `/uploads/providers/${file.filename}`;
+    await this.providersService.update(id, { photoUrl });
+    return { photoUrl };
+  }
+
   // ─── Services ───────────────────────────────────────────────────────────────
 
   @Get(':id/services')
@@ -97,12 +131,28 @@ export class ProvidersController {
   @Post(':id/services')
   async createService(@Req() req: any, @Param('id') id: string, @Body() body: any) {
     await this.assertTenant(req, id);
-    return this.providersService.createService(id, body);
+    const data = {
+      description: body.description,
+      originalPrice: body.originalPrice,
+      insurancePrice: body.insurancePrice,
+      discountedPrice: body.discountedPrice,
+      discountType: body.discountType,
+      discountValue: body.discountValue,
+    };
+    return this.providersService.createService(id, data);
   }
 
   @Put('services/:serviceId')
   updateService(@Param('serviceId') serviceId: string, @Body() body: any) {
-    return this.providersService.updateService(serviceId, body);
+    const data = {
+      description: body.description,
+      originalPrice: body.originalPrice,
+      insurancePrice: body.insurancePrice,
+      discountedPrice: body.discountedPrice,
+      discountType: body.discountType,
+      discountValue: body.discountValue,
+    };
+    return this.providersService.updateService(serviceId, data);
   }
 
   @Delete('services/:serviceId')

@@ -14,15 +14,29 @@ async function handler(req: NextRequest, { params }: { params: Promise<{ slug: s
   const { slug } = await params;
   const path = '/' + slug.join('/');
   const queryString = req.nextUrl.search;
-  const body = ['GET', 'HEAD', 'DELETE'].includes(req.method) ? undefined : await req.text();
+
+  const contentType = req.headers.get('content-type') ?? '';
+  const isMultipart = contentType.includes('multipart/form-data');
+
+  let body: BodyInit | undefined;
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${token}`,
+  };
+
+  if (['GET', 'HEAD', 'DELETE'].includes(req.method)) {
+    body = undefined;
+  } else if (isMultipart) {
+    body = await req.arrayBuffer();
+    headers['Content-Type'] = contentType;
+  } else {
+    body = await req.text();
+    headers['Content-Type'] = 'application/json';
+  }
 
   try {
     const res = await fetch(`${INTERNAL_API}${path}${queryString}`, {
       method: req.method,
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
+      headers,
       body,
     });
 

@@ -1,5 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import * as express from 'express';
+import * as path from 'path';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
@@ -7,6 +9,9 @@ async function bootstrap() {
     throw new Error('JWT_SECRET não definido. Configure a variável de ambiente antes de iniciar.');
   }
   const app = await NestFactory.create(AppModule);
+
+  // Servir uploads como arquivos estáticos
+  app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
   app.enableCors({
     origin: process.env.CORS_ORIGIN?.split(',') ?? ['https://aciavsaude.com.br', 'https://www.aciavsaude.com.br'],

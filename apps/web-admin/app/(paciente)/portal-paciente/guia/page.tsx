@@ -13,6 +13,7 @@ interface Provider {
   phone?: string;
   whatsapp?: string;
   bio?: string;
+  photoUrl?: string;
   rankingScore: number;
   _count: { transactions: number; services: number };
 }
@@ -65,9 +66,13 @@ export default async function GuiaMedicoPage() {
             return (
               <div key={p.id} className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 hover:border-[#007178]/30 hover:-translate-y-1 transition-all group">
                 <div className="flex justify-between items-start mb-4">
-                  <div className="w-14 h-14 bg-[#007178]/10 text-[#007178] rounded-2xl flex items-center justify-center flex-shrink-0 group-hover:bg-[#007178] group-hover:text-white transition-colors">
-                    <Stethoscope size={24} />
-                  </div>
+                  {p.photoUrl ? (
+                    <img src={p.photoUrl} alt="" className="w-14 h-14 rounded-2xl object-cover flex-shrink-0" />
+                  ) : (
+                    <div className="w-14 h-14 bg-[#007178]/10 text-[#007178] rounded-2xl flex items-center justify-center flex-shrink-0 group-hover:bg-[#007178] group-hover:text-white transition-colors">
+                      <Stethoscope size={24} />
+                    </div>
+                  )}
                   <div className="bg-emerald-50 text-emerald-600 px-3 py-1 rounded-full text-xs font-black border border-emerald-100">
                     {p._count.services} serviço{p._count.services !== 1 ? 's' : ''}
                   </div>

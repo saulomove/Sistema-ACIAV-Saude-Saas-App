@@ -8,6 +8,8 @@ interface Service {
   originalPrice: number;
   insurancePrice: number;
   discountedPrice: number;
+  discountType: string;
+  discountValue: number;
 }
 
 function fmtMoney(v: number) {
@@ -60,6 +62,7 @@ export default function ServicosClient({
                 <th className="text-right px-6 py-3 font-bold">Convênio</th>
                 <th className="text-right px-6 py-3 font-bold">ACIAV</th>
                 <th className="text-right px-6 py-3 font-bold">Desconto</th>
+                <th className="text-right px-6 py-3 font-bold">Tipo</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
@@ -78,6 +81,11 @@ export default function ServicosClient({
                   <td className="px-6 py-4 text-right">
                     <span className="bg-emerald-100 text-emerald-700 text-xs font-bold px-2 py-1 rounded-full">
                       -{discountPct(s.originalPrice, s.discountedPrice)}%
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-right">
+                    <span className="bg-slate-100 text-slate-600 text-xs font-medium px-2 py-1 rounded-full">
+                      {s.discountType === 'percentage' ? 'Percentual' : 'Valor Fixo'}
                     </span>
                   </td>
                 </tr>
