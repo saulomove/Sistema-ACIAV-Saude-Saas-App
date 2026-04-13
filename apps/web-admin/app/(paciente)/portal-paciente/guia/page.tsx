@@ -1,12 +1,17 @@
 import { redirect } from 'next/navigation';
 import { getSessionUser, serverFetch } from '../../../../lib/server-api';
-import { Search, MapPin, Stethoscope } from 'lucide-react';
+import { Search, MapPin, Stethoscope, Phone } from 'lucide-react';
 
 interface Provider {
   id: string;
   name: string;
+  professionalName?: string;
+  clinicName?: string;
   category: string;
+  specialty?: string;
   address?: string;
+  phone?: string;
+  whatsapp?: string;
   bio?: string;
   rankingScore: number;
   _count: { transactions: number; services: number };
@@ -68,14 +73,27 @@ export default async function GuiaMedicoPage() {
                   </div>
                 </div>
                 <h3 className="text-xl font-bold text-slate-800 group-hover:text-[#007178] transition-colors">{p.name}</h3>
-                <p className="text-sm font-bold text-slate-500 mt-1">{p.category}</p>
-                {p.bio && <p className="text-sm text-slate-400 mt-2 line-clamp-2">{p.bio}</p>}
-                {addr && (
-                  <div className="flex items-center gap-2 text-sm text-slate-400 mt-3">
-                    <MapPin size={14} />
-                    <span>{addr.city ?? addr.street ?? JSON.stringify(addr)}</span>
-                  </div>
+                <p className="text-sm font-bold text-slate-500 mt-1">
+                  {p.category}{p.specialty ? ` — ${p.specialty}` : ''}
+                </p>
+                {p.professionalName && p.clinicName && (
+                  <p className="text-xs text-slate-400 mt-1">{p.professionalName}</p>
                 )}
+                {p.bio && <p className="text-sm text-slate-400 mt-2 line-clamp-2">{p.bio}</p>}
+                <div className="space-y-1.5 mt-3">
+                  {addr && (
+                    <div className="flex items-center gap-2 text-sm text-slate-400">
+                      <MapPin size={14} className="shrink-0" />
+                      <span>{addr.city ?? addr.street ?? JSON.stringify(addr)}</span>
+                    </div>
+                  )}
+                  {p.whatsapp && (
+                    <div className="flex items-center gap-2 text-sm text-slate-400">
+                      <Phone size={14} className="shrink-0" />
+                      <span>{p.whatsapp}</span>
+                    </div>
+                  )}
+                </div>
                 <div className="mt-4 pt-4 border-t border-gray-100 flex items-center justify-between text-xs text-slate-400">
                   <span>{p._count.transactions} atendimento{p._count.transactions !== 1 ? 's' : ''} realizados</span>
                   <span className="font-bold text-[#007178]">Score: {p.rankingScore.toFixed(1)}</span>

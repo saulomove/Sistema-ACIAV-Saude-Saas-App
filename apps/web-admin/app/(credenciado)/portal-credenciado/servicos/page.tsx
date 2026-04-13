@@ -6,6 +6,7 @@ interface Service {
   id: string;
   description: string;
   originalPrice: number;
+  insurancePrice: number;
   discountedPrice: number;
 }
 

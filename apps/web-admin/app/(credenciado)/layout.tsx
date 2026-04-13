@@ -4,7 +4,7 @@ import SidebarCred from '../../components/SidebarCred';
 import { Bell } from 'lucide-react';
 import Image from 'next/image';
 
-interface Provider { id: string; name: string; category: string; }
+interface Provider { id: string; name: string; professionalName?: string; clinicName?: string; category: string; specialty?: string; }
 
 function HeaderCred({ name, category }: { name: string; category: string }) {
   const initials = name.split(' ').slice(0, 2).map((n) => n[0]).join('').toUpperCase();
@@ -48,8 +48,8 @@ export default async function CredenciadoLayout({ children }: { children: React.
   if (user.providerId) {
     const provider = await serverFetch<Provider>(`/providers/${user.providerId}`);
     if (provider) {
-      providerName = provider.name;
-      providerCategory = provider.category;
+      providerName = provider.clinicName || provider.professionalName || provider.name;
+      providerCategory = provider.specialty ? `${provider.category} — ${provider.specialty}` : provider.category;
     }
   }
 

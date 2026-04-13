@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import {
   Stethoscope, Plus, Search, Pencil, Trash2, Star, Loader2, X,
   MapPin, FileText, Wrench, ChevronRight, Save, AlertCircle,
-  CheckCircle2, Building2,
+  CheckCircle2, Building2, Phone, Copy, Key,
 } from 'lucide-react';
 import Modal from '../../../components/Modal';
 import { api } from '../../../lib/api-client';
@@ -14,39 +14,57 @@ interface Service {
   id: string;
   description: string;
   originalPrice: number;
+  insurancePrice: number;
   discountedPrice: number;
 }
 
 interface Provider {
   id: string;
   name: string;
+  professionalName?: string | null;
+  clinicName?: string | null;
+  registration?: string | null;
+  cpfCnpj?: string | null;
   category: string;
+  specialty?: string | null;
+  address?: string | null;
+  phone?: string | null;
+  whatsapp?: string | null;
+  email?: string | null;
+  discountType?: string | null;
+  discountValue?: number | null;
+  photoUrl?: string | null;
   rankingScore: number;
   bio?: string | null;
-  address?: string | null;
   status?: boolean;
   _count?: { transactions: number };
 }
 
 const CATEGORIES = [
-  'Odontologia', 'Médico', 'Farmácia', 'Laboratório', 'Fisioterapia',
-  'Terapias', 'Nutrição', 'Psicologia', 'Oftalmologia', 'Outro',
+  'Consultas', 'Exames', 'Medicamentos', 'Odontologia', 'Fisioterapia',
+  'Laboratório', 'Terapias', 'Nutrição', 'Psicologia', 'Oftalmologia', 'Outro',
 ];
 
 const CATEGORY_STYLE: Record<string, string> = {
+  Consultas: 'bg-blue-50 text-blue-700',
+  Exames: 'bg-cyan-50 text-cyan-700',
+  Medicamentos: 'bg-orange-50 text-orange-700',
   Odontologia: 'bg-emerald-50 text-emerald-700',
-  Médico: 'bg-blue-50 text-blue-700',
-  Farmácia: 'bg-orange-50 text-orange-700',
-  Laboratório: 'bg-cyan-50 text-cyan-700',
   Fisioterapia: 'bg-rose-50 text-rose-700',
+  Laboratório: 'bg-cyan-50 text-cyan-700',
   Terapias: 'bg-purple-50 text-purple-700',
   Nutrição: 'bg-lime-50 text-lime-700',
   Psicologia: 'bg-indigo-50 text-indigo-700',
   Oftalmologia: 'bg-sky-50 text-sky-700',
 };
 
-const EMPTY_FORM = { name: '', category: 'Médico', bio: '', address: '' };
-const EMPTY_SERVICE_FORM = { description: '', originalPrice: '', discountedPrice: '' };
+const EMPTY_FORM = {
+  professionalName: '', clinicName: '', registration: '', cpfCnpj: '',
+  category: 'Consultas', specialty: '', address: '', phone: '', whatsapp: '',
+  email: '', discountType: 'fixed', discountValue: '', bio: '',
+};
+
+const EMPTY_SERVICE_FORM = { description: '', originalPrice: '', insurancePrice: '', discountedPrice: '' };
 
 function fmtMoney(v: number) {
   return Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -55,6 +73,29 @@ function fmtMoney(v: number) {
 function discountPct(orig: number, disc: number) {
   if (!orig || orig === 0) return 0;
   return Math.round(((orig - disc) / orig) * 100);
+}
+
+function formatCpfCnpj(value: string) {
+  const digits = value.replace(/\D/g, '');
+  if (digits.length <= 11) {
+    return digits
+      .slice(0, 11)
+      .replace(/(\d{3})(\d)/, '$1.$2')
+      .replace(/(\d{3})(\d)/, '$1.$2')
+      .replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+  }
+  return digits
+    .slice(0, 14)
+    .replace(/(\d{2})(\d)/, '$1.$2')
+    .replace(/(\d{3})(\d)/, '$1.$2')
+    .replace(/(\d{3})(\d)/, '$1/$2')
+    .replace(/(\d{4})(\d{1,2})$/, '$1-$2');
+}
+
+function formatPhone(value: string) {
+  const digits = value.replace(/\D/g, '').slice(0, 11);
+  if (digits.length <= 10) return digits.replace(/(\d{2})(\d{4})(\d{0,4})/, '($1) $2-$3');
+  return digits.replace(/(\d{2})(\d{5})(\d{0,4})/, '($1) $2-$3');
 }
 
 export default function CredenciadosClient({
@@ -76,6 +117,7 @@ export default function CredenciadosClient({
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [tempPassword, setTempPassword] = useState<string | null>(null);
 
   // Drawer
   const [drawerProvider, setDrawerProvider] = useState<Provider | null>(null);
@@ -93,11 +135,18 @@ export default function CredenciadosClient({
   const [serviceToast, setServiceToast] = useState('');
   const [serviceToastType, setServiceToastType] = useState<'ok' | 'err'>('ok');
 
+  // Copied feedback
+  const [copied, setCopied] = useState(false);
+
   const providerList = providers as Provider[];
   const categories = Array.from(new Set(providerList.map((p) => p.category).filter(Boolean)));
 
   const lista = providerList.filter((p) => {
-    const matchSearch = !search || p.name.toLowerCase().includes(search.toLowerCase());
+    const matchSearch = !search ||
+      p.name.toLowerCase().includes(search.toLowerCase()) ||
+      (p.specialty ?? '').toLowerCase().includes(search.toLowerCase()) ||
+      (p.professionalName ?? '').toLowerCase().includes(search.toLowerCase()) ||
+      (p.clinicName ?? '').toLowerCase().includes(search.toLowerCase());
     const matchCat = categoryFilter === 'todos' || p.category === categoryFilter;
     return matchSearch && matchCat;
   });
@@ -133,40 +182,87 @@ export default function CredenciadosClient({
     setServiceModalOpen(false);
   }
 
+  function copyCredentials(email: string, password: string) {
+    navigator.clipboard.writeText(`Login: ${email}\nSenha: ${password}`);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2500);
+  }
+
   // ── Provider CRUD ──────────────────────────────────────────────────────────
 
   function openCreate() {
     setEditingId(null);
     setForm(EMPTY_FORM);
     setError('');
+    setTempPassword(null);
     setModalOpen(true);
   }
 
-  function openEdit(p: Provider, e: React.MouseEvent) {
-    e.stopPropagation();
+  function openEdit(p: Provider, e?: React.MouseEvent) {
+    e?.stopPropagation();
     setEditingId(p.id);
-    setForm({ name: p.name, category: p.category, bio: p.bio ?? '', address: p.address ?? '' });
+    setForm({
+      professionalName: p.professionalName ?? '',
+      clinicName: p.clinicName ?? '',
+      registration: p.registration ?? '',
+      cpfCnpj: p.cpfCnpj ?? '',
+      category: p.category,
+      specialty: p.specialty ?? '',
+      address: p.address ?? '',
+      phone: p.phone ?? '',
+      whatsapp: p.whatsapp ?? '',
+      email: p.email ?? '',
+      discountType: p.discountType ?? 'fixed',
+      discountValue: p.discountValue ? String(p.discountValue) : '',
+      bio: p.bio ?? '',
+    });
     setError('');
+    setTempPassword(null);
     setModalOpen(true);
   }
 
   async function handleSave() {
-    if (!form.name.trim()) { setError('Nome é obrigatório.'); return; }
+    if (!form.professionalName.trim() && !form.clinicName.trim()) {
+      setError('Informe o nome do profissional ou da clínica.');
+      return;
+    }
+    if (!form.email.trim() && !editingId) {
+      setError('E-mail é obrigatório (será o login do credenciado).');
+      return;
+    }
     setSaving(true);
     setError('');
     try {
+      const payload = {
+        unitId,
+        name: form.clinicName.trim() || form.professionalName.trim(),
+        professionalName: form.professionalName.trim() || undefined,
+        clinicName: form.clinicName.trim() || undefined,
+        registration: form.registration.trim() || undefined,
+        cpfCnpj: form.cpfCnpj.replace(/\D/g, '') || undefined,
+        category: form.category,
+        specialty: form.specialty.trim() || undefined,
+        address: form.address.trim() || undefined,
+        phone: form.phone.replace(/\D/g, '') || undefined,
+        whatsapp: form.whatsapp.replace(/\D/g, '') || undefined,
+        email: form.email.trim() || undefined,
+        discountType: form.discountType,
+        discountValue: form.discountValue ? parseFloat(form.discountValue) : 0,
+        bio: form.bio.trim() || undefined,
+      };
+
       if (editingId) {
-        await api.put(`/providers/${editingId}`, {
-          name: form.name, category: form.category,
-          bio: form.bio || undefined, address: form.address || undefined,
-        });
+        await api.put(`/providers/${editingId}`, payload);
+        setModalOpen(false);
       } else {
-        await api.post('/providers', {
-          unitId, name: form.name, category: form.category,
-          bio: form.bio || undefined, address: form.address || undefined,
-        });
+        const result = await api.post('/providers', payload);
+        const r = result as { tempPassword?: string } | null;
+        if (r?.tempPassword) {
+          setTempPassword(r.tempPassword);
+        } else {
+          setModalOpen(false);
+        }
       }
-      setModalOpen(false);
       startTransition(() => router.refresh());
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Erro ao salvar.');
@@ -216,6 +312,7 @@ export default function CredenciadosClient({
     setServiceForm({
       description: s.description,
       originalPrice: String(s.originalPrice),
+      insurancePrice: String(s.insurancePrice ?? 0),
       discountedPrice: String(s.discountedPrice),
     });
     setServiceFormError('');
@@ -225,6 +322,7 @@ export default function CredenciadosClient({
   async function handleSaveService() {
     if (!serviceForm.description.trim()) { setServiceFormError('Informe a descrição do serviço.'); return; }
     const orig = parseFloat(serviceForm.originalPrice.replace(',', '.'));
+    const ins = parseFloat(serviceForm.insurancePrice.replace(',', '.') || '0');
     const disc = parseFloat(serviceForm.discountedPrice.replace(',', '.'));
     if (isNaN(orig) || orig <= 0) { setServiceFormError('Informe um valor particular válido.'); return; }
     if (isNaN(disc) || disc < 0) { setServiceFormError('Informe um valor ACIAV válido.'); return; }
@@ -237,6 +335,7 @@ export default function CredenciadosClient({
         const updated = await api.put(`/providers/services/${editingService.id}`, {
           description: serviceForm.description,
           originalPrice: orig,
+          insurancePrice: isNaN(ins) ? 0 : ins,
           discountedPrice: disc,
         }) as Service;
         setServices((prev) => prev.map((s) => (s.id === editingService.id ? updated : s)));
@@ -245,6 +344,7 @@ export default function CredenciadosClient({
         const created = await api.post(`/providers/${drawerProvider!.id}/services`, {
           description: serviceForm.description,
           originalPrice: orig,
+          insurancePrice: isNaN(ins) ? 0 : ins,
           discountedPrice: disc,
         }) as Service;
         setServices((prev) => [...prev, created]);
@@ -306,7 +406,7 @@ export default function CredenciadosClient({
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Buscar clínica ou médico..."
+              placeholder="Buscar por nome, especialidade..."
               className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
             />
           </div>
@@ -332,8 +432,8 @@ export default function CredenciadosClient({
                 <tr>
                   <th className="px-6 py-4">Credenciado</th>
                   <th className="px-6 py-4">Categoria</th>
+                  <th className="px-6 py-4">Especialidade</th>
                   <th className="px-6 py-4">Score</th>
-                  <th className="px-6 py-4">Atend.</th>
                   <th className="px-6 py-4">Status</th>
                   <th className="px-6 py-4 text-right">Ações</th>
                 </tr>
@@ -354,9 +454,12 @@ export default function CredenciadosClient({
                           </span>
                           <ChevronRight size={14} className="text-slate-300 group-hover:text-primary transition-colors" />
                         </div>
-                        {p.address && (
+                        {p.professionalName && p.clinicName && (
+                          <p className="text-xs text-slate-400 mt-0.5">{p.professionalName}</p>
+                        )}
+                        {p.whatsapp && (
                           <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-1">
-                            <MapPin size={10} />{p.address}
+                            <Phone size={10} />{p.whatsapp}
                           </p>
                         )}
                       </td>
@@ -365,13 +468,13 @@ export default function CredenciadosClient({
                           {p.category || '—'}
                         </span>
                       </td>
+                      <td className="px-6 py-4 text-slate-500 text-xs">{p.specialty || '—'}</td>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-1 text-amber-500 font-medium">
                           <Star size={15} fill="currentColor" strokeWidth={0} />
                           {(p.rankingScore ?? 0).toFixed(1)}
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-slate-500">{p._count?.transactions ?? 0}</td>
                       <td className="px-6 py-4">
                         <button
                           onClick={(e) => handleToggleStatus(p, e)}
@@ -383,7 +486,7 @@ export default function CredenciadosClient({
                       <td className="px-6 py-4 text-right">
                         <div className="flex items-center justify-end gap-1">
                           <button
-                            onClick={(e) => openEdit(p, e)}
+                            onClick={(e) => { e.stopPropagation(); openEdit(p); }}
                             className="text-slate-400 hover:text-blue-600 p-2 rounded-lg hover:bg-blue-50 transition-colors"
                             title="Editar"
                           >
@@ -421,9 +524,14 @@ export default function CredenciadosClient({
                 </div>
                 <div>
                   <h2 className="font-bold text-slate-800 text-lg leading-tight">{drawerProvider.name}</h2>
-                  <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${CATEGORY_STYLE[drawerProvider.category] ?? 'bg-slate-100 text-slate-600'}`}>
-                    {drawerProvider.category}
-                  </span>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${CATEGORY_STYLE[drawerProvider.category] ?? 'bg-slate-100 text-slate-600'}`}>
+                      {drawerProvider.category}
+                    </span>
+                    {drawerProvider.specialty && (
+                      <span className="text-xs text-slate-500">{drawerProvider.specialty}</span>
+                    )}
+                  </div>
                 </div>
               </div>
               <button
@@ -470,22 +578,72 @@ export default function CredenciadosClient({
                     </div>
                   </div>
 
-                  {drawerProvider.address && (
-                    <div>
-                      <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">Endereço</p>
-                      <div className="flex items-start gap-2 text-slate-700 text-sm bg-slate-50 rounded-xl px-4 py-3">
-                        <MapPin size={15} className="mt-0.5 text-slate-400 shrink-0" />
-                        {drawerProvider.address}
+                  {/* Info cards */}
+                  <div className="space-y-3">
+                    {drawerProvider.professionalName && (
+                      <div className="bg-slate-50 rounded-xl px-4 py-3">
+                        <p className="text-xs text-slate-400 font-bold uppercase tracking-wide">Profissional</p>
+                        <p className="text-sm text-slate-700 font-medium mt-0.5">{drawerProvider.professionalName}</p>
                       </div>
+                    )}
+                    {drawerProvider.clinicName && (
+                      <div className="bg-slate-50 rounded-xl px-4 py-3">
+                        <p className="text-xs text-slate-400 font-bold uppercase tracking-wide">Clínica</p>
+                        <p className="text-sm text-slate-700 font-medium mt-0.5">{drawerProvider.clinicName}</p>
+                      </div>
+                    )}
+                    {drawerProvider.registration && (
+                      <div className="bg-slate-50 rounded-xl px-4 py-3">
+                        <p className="text-xs text-slate-400 font-bold uppercase tracking-wide">Registro Profissional</p>
+                        <p className="text-sm text-slate-700 font-medium mt-0.5">{drawerProvider.registration}</p>
+                      </div>
+                    )}
+                    {drawerProvider.cpfCnpj && (
+                      <div className="bg-slate-50 rounded-xl px-4 py-3">
+                        <p className="text-xs text-slate-400 font-bold uppercase tracking-wide">CPF/CNPJ</p>
+                        <p className="text-sm text-slate-700 font-mono mt-0.5">{drawerProvider.cpfCnpj}</p>
+                      </div>
+                    )}
+                    {drawerProvider.address && (
+                      <div className="bg-slate-50 rounded-xl px-4 py-3">
+                        <p className="text-xs text-slate-400 font-bold uppercase tracking-wide">Endereço</p>
+                        <div className="flex items-start gap-2 text-slate-700 text-sm mt-0.5">
+                          <MapPin size={15} className="mt-0.5 text-slate-400 shrink-0" />
+                          {drawerProvider.address}
+                        </div>
+                      </div>
+                    )}
+                    <div className="grid grid-cols-2 gap-3">
+                      {drawerProvider.phone && (
+                        <div className="bg-slate-50 rounded-xl px-4 py-3">
+                          <p className="text-xs text-slate-400 font-bold uppercase tracking-wide">Telefone</p>
+                          <p className="text-sm text-slate-700 mt-0.5">{drawerProvider.phone}</p>
+                        </div>
+                      )}
+                      {drawerProvider.whatsapp && (
+                        <div className="bg-slate-50 rounded-xl px-4 py-3">
+                          <p className="text-xs text-slate-400 font-bold uppercase tracking-wide">WhatsApp</p>
+                          <p className="text-sm text-slate-700 mt-0.5">{drawerProvider.whatsapp}</p>
+                        </div>
+                      )}
                     </div>
-                  )}
+                    {drawerProvider.bio && (
+                      <div className="bg-slate-50 rounded-xl px-4 py-3">
+                        <p className="text-xs text-slate-400 font-bold uppercase tracking-wide">Sobre</p>
+                        <p className="text-sm text-slate-700 mt-0.5 leading-relaxed">{drawerProvider.bio}</p>
+                      </div>
+                    )}
+                  </div>
 
-                  {drawerProvider.bio && (
-                    <div>
-                      <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">Sobre</p>
-                      <p className="text-sm text-slate-700 bg-slate-50 rounded-xl px-4 py-3 leading-relaxed">
-                        {drawerProvider.bio}
-                      </p>
+                  {/* Login info */}
+                  {drawerProvider.email && (
+                    <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-xs text-blue-600 font-bold uppercase tracking-wide flex items-center gap-1"><Key size={12} /> Login do Credenciado</p>
+                          <p className="text-sm text-blue-800 font-medium mt-0.5">{drawerProvider.email}</p>
+                        </div>
+                      </div>
                     </div>
                   )}
 
@@ -498,7 +656,7 @@ export default function CredenciadosClient({
 
                   <div className="pt-2 border-t border-gray-100">
                     <button
-                      onClick={(e) => openEdit(drawerProvider, e)}
+                      onClick={() => openEdit(drawerProvider)}
                       className="w-full flex items-center justify-center gap-2 bg-primary hover:bg-primary-dark text-white py-2.5 rounded-xl font-medium transition-colors"
                     >
                       <Pencil size={16} /> Editar Perfil
@@ -547,6 +705,9 @@ export default function CredenciadosClient({
                             <p className="font-semibold text-slate-800 text-sm">{s.description}</p>
                             <div className="flex items-center gap-3 mt-2 flex-wrap">
                               <span className="text-xs text-slate-400 line-through">{fmtMoney(s.originalPrice)}</span>
+                              {Number(s.insurancePrice) > 0 && (
+                                <span className="text-xs text-blue-600">Conv: {fmtMoney(s.insurancePrice)}</span>
+                              )}
                               <span className="text-sm font-bold text-[#007178]">{fmtMoney(s.discountedPrice)}</span>
                               <span className="bg-emerald-100 text-emerald-700 text-xs font-bold px-2 py-0.5 rounded-full">
                                 -{discountPct(s.originalPrice, s.discountedPrice)}%
@@ -607,25 +768,35 @@ export default function CredenciadosClient({
                   className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-slate-50"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-1.5">Preço Particular (R$)</label>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5">Particular (R$)</label>
                   <input
                     type="number" step="0.01" min="0"
                     value={serviceForm.originalPrice}
                     onChange={(e) => setServiceForm((f) => ({ ...f, originalPrice: e.target.value }))}
                     placeholder="200.00"
-                    className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-slate-50"
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-slate-50 text-sm"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-1.5">Preço ACIAV (R$)</label>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5">Convênio (R$)</label>
+                  <input
+                    type="number" step="0.01" min="0"
+                    value={serviceForm.insurancePrice}
+                    onChange={(e) => setServiceForm((f) => ({ ...f, insurancePrice: e.target.value }))}
+                    placeholder="180.00"
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-slate-50 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5">ACIAV (R$)</label>
                   <input
                     type="number" step="0.01" min="0"
                     value={serviceForm.discountedPrice}
                     onChange={(e) => setServiceForm((f) => ({ ...f, discountedPrice: e.target.value }))}
                     placeholder="140.00"
-                    className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-slate-50"
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-slate-50 text-sm"
                   />
                 </div>
               </div>
@@ -668,64 +839,241 @@ export default function CredenciadosClient({
       )}
 
       {/* ── Provider modal (create/edit) ───────────────────────────────────── */}
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editingId ? 'Editar Credenciado' : 'Novo Credenciado'}>
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-bold text-slate-700 mb-1.5">Nome *</label>
-            <input
-              type="text"
-              value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
-              className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-slate-50"
-              placeholder="Nome da clínica, médico ou estabelecimento"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-bold text-slate-700 mb-1.5">Categoria *</label>
-            <select
-              value={form.category}
-              onChange={(e) => setForm({ ...form, category: e.target.value })}
-              className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-slate-50"
-            >
-              {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-bold text-slate-700 mb-1.5">Endereço</label>
-            <input
-              type="text"
-              value={form.address}
-              onChange={(e) => setForm({ ...form, address: e.target.value })}
-              className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-slate-50"
-              placeholder="Rua, número, bairro, cidade"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-bold text-slate-700 mb-1.5">Descrição / Bio</label>
-            <textarea
-              value={form.bio}
-              onChange={(e) => setForm({ ...form, bio: e.target.value })}
-              rows={3}
-              className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-slate-50 resize-none"
-              placeholder="Especialidades, diferenciais, informações relevantes..."
-            />
-          </div>
-          {error && (
-            <p className="text-sm text-red-600 bg-red-50 border border-red-200 px-4 py-2.5 rounded-lg">{error}</p>
+      <Modal open={modalOpen} onClose={() => { setModalOpen(false); setTempPassword(null); }} title={editingId ? 'Editar Credenciado' : 'Novo Credenciado'}>
+        <div className="space-y-5 max-h-[75vh] overflow-y-auto pr-1">
+
+          {/* ── Tela de credenciais (após criar) ── */}
+          {tempPassword && (
+            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-5 space-y-3">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 size={20} className="text-emerald-600" />
+                <p className="text-sm font-bold text-emerald-800">Credenciado criado com sucesso!</p>
+              </div>
+              <p className="text-xs text-emerald-700">Compartilhe as credenciais abaixo com o credenciado. No primeiro acesso ele poderá trocar a senha.</p>
+              <div className="bg-white border border-emerald-200 rounded-lg px-4 py-3 space-y-1">
+                <p className="text-xs text-slate-500">Login: <span className="font-bold text-slate-800">{form.email}</span></p>
+                <p className="text-xs text-slate-500">Senha temporária: <span className="font-bold font-mono text-slate-800">{tempPassword}</span></p>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => copyCredentials(form.email, tempPassword)}
+                  className="flex-1 bg-emerald-600 text-white py-2 rounded-lg text-sm font-bold hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2"
+                >
+                  <Copy size={14} /> {copied ? 'Copiado!' : 'Copiar Credenciais'}
+                </button>
+                <button
+                  onClick={() => { setModalOpen(false); setTempPassword(null); }}
+                  className="flex-1 border border-emerald-300 text-emerald-700 py-2 rounded-lg text-sm font-bold hover:bg-emerald-100 transition-colors"
+                >
+                  Fechar
+                </button>
+              </div>
+              <p className="text-xs text-amber-700 font-medium">Anote a senha — ela não será exibida novamente.</p>
+            </div>
           )}
-          <div className="flex gap-3 pt-2">
-            <button onClick={() => setModalOpen(false)} className="flex-1 border border-gray-200 text-slate-700 py-2.5 rounded-xl font-medium hover:bg-slate-50 transition-colors">
-              Cancelar
-            </button>
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className="flex-1 bg-primary text-white py-2.5 rounded-xl font-medium hover:bg-primary-dark transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-            >
-              {saving && <Loader2 size={16} className="animate-spin" />}
-              {saving ? 'Salvando...' : editingId ? 'Salvar Alterações' : 'Cadastrar'}
-            </button>
-          </div>
+
+          {/* ── Formulário ── */}
+          {!tempPassword && (
+            <>
+              {/* Seção 1: Identificação */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 pb-1 border-b border-gray-100">
+                  <div className="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-black">1</div>
+                  <h3 className="text-sm font-bold text-slate-700">Identificação do Profissional / Clínica</h3>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">Nome do Profissional de Saúde *</label>
+                  <p className="text-xs text-slate-400 mb-1.5">Nome completo do médico, dentista, fisioterapeuta, etc.</p>
+                  <input
+                    type="text"
+                    value={form.professionalName}
+                    onChange={(e) => setForm({ ...form, professionalName: e.target.value })}
+                    className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-slate-50"
+                    placeholder="Dr. João Silva"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">Nome da Clínica / Estabelecimento</label>
+                  <p className="text-xs text-slate-400 mb-1.5">Deixe em branco se for profissional autônomo</p>
+                  <input
+                    type="text"
+                    value={form.clinicName}
+                    onChange={(e) => setForm({ ...form, clinicName: e.target.value })}
+                    className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-slate-50"
+                    placeholder="Clínica Saúde Total"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1">Registro Profissional</label>
+                    <p className="text-xs text-slate-400 mb-1.5">CRM, CREFITO, CRO, etc.</p>
+                    <input
+                      type="text"
+                      value={form.registration}
+                      onChange={(e) => setForm({ ...form, registration: e.target.value })}
+                      className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-slate-50"
+                      placeholder="CRM 12345/SP"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1">CPF / CNPJ *</label>
+                    <p className="text-xs text-slate-400 mb-1.5">Documento do profissional ou empresa</p>
+                    <input
+                      type="text"
+                      value={form.cpfCnpj}
+                      onChange={(e) => setForm({ ...form, cpfCnpj: formatCpfCnpj(e.target.value) })}
+                      className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-slate-50 font-mono"
+                      placeholder="000.000.000-00"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Seção 2: Contato */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 pb-1 border-b border-gray-100">
+                  <div className="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-black">2</div>
+                  <h3 className="text-sm font-bold text-slate-700">Contato e Localização</h3>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1.5">Endereço completo</label>
+                  <input
+                    type="text"
+                    value={form.address}
+                    onChange={(e) => setForm({ ...form, address: e.target.value })}
+                    className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-slate-50"
+                    placeholder="Rua, número, bairro, cidade - UF"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1.5">Telefone Fixo</label>
+                    <input
+                      type="text"
+                      value={form.phone}
+                      onChange={(e) => setForm({ ...form, phone: formatPhone(e.target.value) })}
+                      className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-slate-50"
+                      placeholder="(00) 0000-0000"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1.5">WhatsApp *</label>
+                    <input
+                      type="text"
+                      value={form.whatsapp}
+                      onChange={(e) => setForm({ ...form, whatsapp: formatPhone(e.target.value) })}
+                      className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-slate-50"
+                      placeholder="(00) 00000-0000"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">E-mail *</label>
+                  <p className="text-xs text-slate-400 mb-1.5">Será usado como login do credenciado na plataforma</p>
+                  <input
+                    type="email"
+                    value={form.email}
+                    onChange={(e) => setForm({ ...form, email: e.target.value })}
+                    className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-slate-50"
+                    placeholder="contato@clinica.com.br"
+                  />
+                </div>
+              </div>
+
+              {/* Seção 3: Categoria e Desconto */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 pb-1 border-b border-gray-100">
+                  <div className="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-black">3</div>
+                  <h3 className="text-sm font-bold text-slate-700">Categoria e Desconto Padrão</h3>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1.5">Categoria *</label>
+                    <select
+                      value={form.category}
+                      onChange={(e) => setForm({ ...form, category: e.target.value })}
+                      className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-slate-50"
+                    >
+                      {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1.5">Especialidade</label>
+                    <input
+                      type="text"
+                      value={form.specialty}
+                      onChange={(e) => setForm({ ...form, specialty: e.target.value })}
+                      className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-slate-50"
+                      placeholder="Pediatra, Cardiologista..."
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">Tipo de Desconto</label>
+                  <p className="text-xs text-slate-400 mb-2">Define como o desconto será aplicado nos serviços</p>
+                  <div className="flex gap-3">
+                    <label className={`flex-1 flex items-center gap-2 p-3 rounded-xl border-2 cursor-pointer transition-all ${form.discountType === 'fixed' ? 'border-primary bg-primary/5' : 'border-gray-200 hover:border-primary/40'}`}>
+                      <input type="radio" name="discountType" value="fixed" checked={form.discountType === 'fixed'} onChange={(e) => setForm({ ...form, discountType: e.target.value })} className="accent-primary" />
+                      <span className="text-sm font-medium text-slate-700">Valor Fixo (R$)</span>
+                    </label>
+                    <label className={`flex-1 flex items-center gap-2 p-3 rounded-xl border-2 cursor-pointer transition-all ${form.discountType === 'percentage' ? 'border-primary bg-primary/5' : 'border-gray-200 hover:border-primary/40'}`}>
+                      <input type="radio" name="discountType" value="percentage" checked={form.discountType === 'percentage'} onChange={(e) => setForm({ ...form, discountType: e.target.value })} className="accent-primary" />
+                      <span className="text-sm font-medium text-slate-700">Percentual (%)</span>
+                    </label>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1.5">
+                    {form.discountType === 'percentage' ? 'Percentual de Desconto (%)' : 'Valor do Desconto (R$)'}
+                  </label>
+                  <input
+                    type="number" step="0.01" min="0"
+                    value={form.discountValue}
+                    onChange={(e) => setForm({ ...form, discountValue: e.target.value })}
+                    className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-slate-50"
+                    placeholder={form.discountType === 'percentage' ? 'Ex: 30' : 'Ex: 50.00'}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1.5">Descrição / Bio</label>
+                  <textarea
+                    value={form.bio}
+                    onChange={(e) => setForm({ ...form, bio: e.target.value })}
+                    rows={3}
+                    className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-slate-50 resize-none"
+                    placeholder="Especialidades, diferenciais, informações relevantes..."
+                  />
+                </div>
+              </div>
+
+              {error && (
+                <p className="text-sm text-red-600 bg-red-50 border border-red-200 px-4 py-2.5 rounded-lg">{error}</p>
+              )}
+              <div className="flex gap-3 pt-2">
+                <button onClick={() => { setModalOpen(false); setTempPassword(null); }} className="flex-1 border border-gray-200 text-slate-700 py-2.5 rounded-xl font-medium hover:bg-slate-50 transition-colors">
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleSave}
+                  disabled={saving}
+                  className="flex-1 bg-primary text-white py-2.5 rounded-xl font-medium hover:bg-primary-dark transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {saving && <Loader2 size={16} className="animate-spin" />}
+                  {saving ? 'Salvando...' : editingId ? 'Salvar Alterações' : 'Cadastrar Credenciado'}
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </Modal>
     </div>

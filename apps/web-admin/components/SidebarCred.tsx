@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Stethoscope, Clock, ShieldCheck, Gift, LogOut, Wrench, Menu, X } from 'lucide-react';
+import { Stethoscope, Clock, ShieldCheck, Gift, LogOut, Wrench, Menu, X, Settings } from 'lucide-react';
 import Image from 'next/image';
 import clsx from 'clsx';
 import { useState } from 'react';
@@ -12,6 +12,7 @@ const menuItems = [
   { name: 'Meus Serviços', icon: Wrench, href: '/portal-credenciado/servicos' },
   { name: 'Histórico', icon: Clock, href: '/portal-credenciado/historico' },
   { name: 'Gamificação', icon: Gift, href: '/portal-credenciado/gamificacao' },
+  { name: 'Configurações', icon: Settings, href: '/portal-credenciado/configuracoes' },
 ];
 
 export default function SidebarCred({

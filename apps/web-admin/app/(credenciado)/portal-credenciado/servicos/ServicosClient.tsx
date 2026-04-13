@@ -6,6 +6,7 @@ interface Service {
   id: string;
   description: string;
   originalPrice: number;
+  insurancePrice: number;
   discountedPrice: number;
 }
 
@@ -55,8 +56,9 @@ export default function ServicosClient({
             <thead>
               <tr className="bg-slate-50 border-b border-gray-100 text-xs text-slate-500 uppercase tracking-wide">
                 <th className="text-left px-6 py-3 font-bold">Serviço</th>
-                <th className="text-right px-6 py-3 font-bold">Preço Particular</th>
-                <th className="text-right px-6 py-3 font-bold">Preço ACIAV</th>
+                <th className="text-right px-6 py-3 font-bold">Particular</th>
+                <th className="text-right px-6 py-3 font-bold">Convênio</th>
+                <th className="text-right px-6 py-3 font-bold">ACIAV</th>
                 <th className="text-right px-6 py-3 font-bold">Desconto</th>
               </tr>
             </thead>
@@ -66,6 +68,9 @@ export default function ServicosClient({
                   <td className="px-6 py-4 font-medium text-slate-700">{s.description}</td>
                   <td className="px-6 py-4 text-right text-slate-400 line-through text-xs">
                     {fmtMoney(s.originalPrice)}
+                  </td>
+                  <td className="px-6 py-4 text-right text-blue-600 text-xs">
+                    {Number(s.insurancePrice) > 0 ? fmtMoney(s.insurancePrice) : '—'}
                   </td>
                   <td className="px-6 py-4 text-right font-bold text-[#007178] text-base">
                     {fmtMoney(s.discountedPrice)}

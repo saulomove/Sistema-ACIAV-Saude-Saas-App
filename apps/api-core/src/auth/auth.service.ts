@@ -141,6 +141,22 @@ export class AuthService {
     });
   }
 
+  async changePassword(authUserId: string, currentPassword: string, newPassword: string) {
+    const authUser = await this.prisma.authUser.findUnique({ where: { id: authUserId } });
+    if (!authUser) throw new UnauthorizedException();
+
+    const match = await bcrypt.compare(currentPassword, authUser.passwordHash);
+    if (!match) throw new BadRequestException('Senha atual incorreta.');
+
+    if (newPassword.length < 8 || !/\d/.test(newPassword)) {
+      throw new BadRequestException('A nova senha deve ter no mínimo 8 caracteres e conter ao menos um número.');
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    await this.prisma.authUser.update({ where: { id: authUserId }, data: { passwordHash } });
+    return { message: 'Senha alterada com sucesso.' };
+  }
+
   async me(authUserId: string) {
     const authUser = await this.prisma.authUser.findUnique({
       where: { id: authUserId },

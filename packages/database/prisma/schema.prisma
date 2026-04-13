@@ -60,16 +60,27 @@ model User {
 }
 
 model Provider {
-  id           String   @id @default(uuid())
-  unitId       String
-  name         String
-  category     String
-  address      String?  // JSON string
-  rankingScore Float    @default(0.0)
-  bio          String?
-  status       Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id               String   @id @default(uuid())
+  unitId           String
+  name             String
+  professionalName String?
+  clinicName       String?
+  registration     String?  // CRM, CREFITO, CRO, etc.
+  cpfCnpj          String?
+  category         String
+  specialty        String?
+  address          String?
+  phone            String?
+  whatsapp         String?
+  email            String?
+  discountType     String   @default("fixed") // "fixed" ou "percentage"
+  discountValue    Decimal  @default(0)
+  photoUrl         String?
+  rankingScore     Float    @default(0.0)
+  bio              String?
+  status           Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   unit         Unit          @relation(fields: [unitId], references: [id], onDelete: Cascade)
   services     Service[]
@@ -82,6 +93,7 @@ model Service {
   providerId      String
   description     String
   originalPrice   Decimal  @default(0.0)
+  insurancePrice  Decimal  @default(0.0)
   discountedPrice Decimal  @default(0.0)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt

@@ -41,6 +41,13 @@ export class AuthController {
     return this.authService.logout(token);
   }
 
+  @Patch('change-password')
+  @UseGuards(AuthGuard('jwt'))
+  @HttpCode(HttpStatus.OK)
+  async changePassword(@Req() req: any, @Body() body: { currentPassword: string; newPassword: string }) {
+    return this.authService.changePassword(req.user.sub, body.currentPassword, body.newPassword);
+  }
+
   @Get('me')
   @UseGuards(AuthGuard('jwt'))
   async me(@Req() req: any) {
