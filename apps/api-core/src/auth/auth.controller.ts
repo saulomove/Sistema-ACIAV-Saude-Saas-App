@@ -29,6 +29,7 @@ export class AuthController {
 
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { ttl: 60000, limit: 10 } })
   async refresh(@Body() body: { refreshToken: string }) {
     return this.authService.refresh(body.refreshToken);
   }
@@ -44,6 +45,7 @@ export class AuthController {
   @Patch('change-password')
   @UseGuards(AuthGuard('jwt'))
   @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { ttl: 3600000, limit: 5 } })
   async changePassword(@Req() req: any, @Body() body: { currentPassword: string; newPassword: string }) {
     return this.authService.changePassword(req.user.sub, body.currentPassword, body.newPassword);
   }

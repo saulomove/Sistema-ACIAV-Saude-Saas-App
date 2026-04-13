@@ -8,14 +8,23 @@ async function bootstrap() {
   }
   const app = await NestFactory.create(AppModule);
 
-  const config = new DocumentBuilder()
-    .setTitle('ACIAV Saúde API')
-    .setDescription('API do sistema de gestão de saúde corporativa ACIAV Saúde')
-    .setVersion('1.0')
-    .addBearerAuth()
-    .build();
-  const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api/docs', app, document);
+  app.enableCors({
+    origin: process.env.CORS_ORIGIN?.split(',') ?? ['https://aciavsaude.com.br', 'https://www.aciavsaude.com.br'],
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  });
+
+  if (process.env.NODE_ENV !== 'production') {
+    const config = new DocumentBuilder()
+      .setTitle('ACIAV Saúde API')
+      .setDescription('API do sistema de gestão de saúde corporativa ACIAV Saúde')
+      .setVersion('1.0')
+      .addBearerAuth()
+      .build();
+    const document = SwaggerModule.createDocument(app, config);
+    SwaggerModule.setup('api/docs', app, document);
+  }
 
   await app.listen(process.env.PORT ?? 3000);
 }

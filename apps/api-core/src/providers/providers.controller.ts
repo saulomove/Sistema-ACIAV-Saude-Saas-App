@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Patch, Param, Body, Query, UseGuards, Req } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Patch, Param, Body, Query, UseGuards, Req, ForbiddenException } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { ProvidersService } from './providers.service';
 
@@ -6,6 +6,14 @@ import { ProvidersService } from './providers.service';
 @UseGuards(AuthGuard('jwt'))
 export class ProvidersController {
   constructor(private providersService: ProvidersService) {}
+
+  private async assertTenant(req: any, providerId: string) {
+    if (req.user.role === 'super_admin') return;
+    const provider = await this.providersService.findOne(providerId);
+    if (provider && provider.unitId !== req.user.unitId) {
+      throw new ForbiddenException('Acesso negado.');
+    }
+  }
 
   @Get()
   findAll(
@@ -27,40 +35,68 @@ export class ProvidersController {
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
+  async findOne(@Req() req: any, @Param('id') id: string) {
+    await this.assertTenant(req, id);
     return this.providersService.findOne(id);
   }
 
   @Post()
   create(@Req() req: any, @Body() body: any) {
-    const data = { ...body, unitId: req.user.unitId ?? body.unitId };
+    const data = {
+      unitId: req.user.unitId ?? body.unitId,
+      name: body.name,
+      professionalName: body.professionalName,
+      clinicName: body.clinicName,
+      registration: body.registration,
+      cpfCnpj: body.cpfCnpj,
+      category: body.category,
+      specialty: body.specialty,
+      address: body.address,
+      phone: body.phone,
+      whatsapp: body.whatsapp,
+      email: body.email,
+      bio: body.bio,
+      discountType: body.discountType,
+      discountValue: body.discountValue,
+      photoUrl: body.photoUrl,
+    };
     return this.providersService.create(data);
   }
 
   @Put(':id')
-  update(@Param('id') id: string, @Body() body: any) {
-    return this.providersService.update(id, body);
+  async update(@Req() req: any, @Param('id') id: string, @Body() body: any) {
+    await this.assertTenant(req, id);
+    const allowed = ['professionalName', 'clinicName', 'registration', 'cpfCnpj', 'category', 'specialty', 'address', 'phone', 'whatsapp', 'email', 'bio', 'discountType', 'discountValue', 'photoUrl', 'status'];
+    const data: any = {};
+    for (const key of allowed) {
+      if (body[key] !== undefined) data[key] = body[key];
+    }
+    return this.providersService.update(id, data);
   }
 
   @Patch(':id/status')
-  toggleStatus(@Param('id') id: string, @Body() body: { status: boolean }) {
+  async toggleStatus(@Req() req: any, @Param('id') id: string, @Body() body: { status: boolean }) {
+    await this.assertTenant(req, id);
     return this.providersService.update(id, { status: body.status });
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string) {
+  async remove(@Req() req: any, @Param('id') id: string) {
+    await this.assertTenant(req, id);
     return this.providersService.remove(id);
   }
 
   // ─── Services ───────────────────────────────────────────────────────────────
 
   @Get(':id/services')
-  getServices(@Param('id') id: string) {
+  async getServices(@Req() req: any, @Param('id') id: string) {
+    await this.assertTenant(req, id);
     return this.providersService.getServices(id);
   }
 
   @Post(':id/services')
-  createService(@Param('id') id: string, @Body() body: any) {
+  async createService(@Req() req: any, @Param('id') id: string, @Body() body: any) {
+    await this.assertTenant(req, id);
     return this.providersService.createService(id, body);
   }
 
@@ -83,12 +119,14 @@ export class ProvidersController {
   }
 
   @Get(':id/rewards')
-  getRewardsByProvider(@Param('id') id: string) {
+  async getRewardsByProvider(@Req() req: any, @Param('id') id: string) {
+    await this.assertTenant(req, id);
     return this.providersService.getRewardsByProvider(id);
   }
 
   @Post(':id/rewards')
-  createReward(@Param('id') id: string, @Body() body: any) {
+  async createReward(@Req() req: any, @Param('id') id: string, @Body() body: any) {
+    await this.assertTenant(req, id);
     return this.providersService.createReward(id, body);
   }
 

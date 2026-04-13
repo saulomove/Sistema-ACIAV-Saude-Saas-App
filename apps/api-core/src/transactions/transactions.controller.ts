@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Body, Query, Param, UseGuards, Req } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Body, Query, Param, UseGuards, Req, ForbiddenException } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { TransactionsService } from './transactions.service';
 
@@ -37,7 +37,10 @@ export class TransactionsController {
   }
 
   @Get('by-user')
-  findByUser(@Query('userId') userId: string) {
+  async findByUser(@Req() req: any, @Query('userId') userId: string) {
+    if (req.user.role === 'patient' && req.user.userId !== userId) {
+      throw new ForbiddenException('Acesso negado.');
+    }
     return this.transactionsService.findByUser(userId);
   }
 
