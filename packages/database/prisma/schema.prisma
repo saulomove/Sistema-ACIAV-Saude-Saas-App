@@ -47,17 +47,24 @@ model Company {
 }
 
 model User {
-  id            String   @id @default(uuid())
+  id            String    @id @default(uuid())
   companyId     String?
   unitId        String
+  externalCode  String?
   fullName      String
   cpf           String
-  type          String   // 'titular' or 'dependente'
+  type          String    // 'titular' or 'dependente'
   parentId      String?
-  pointsBalance Int      @default(0)
-  status        Boolean  @default(true)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  gender        String?
+  birthDate     DateTime?
+  phone         String?
+  kinship       String?
+  billingName   String?
+  memberSince   DateTime?
+  pointsBalance Int       @default(0)
+  status        Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   unit         Unit           @relation(fields: [unitId], references: [id], onDelete: Cascade)
   company      Company?       @relation(fields: [companyId], references: [id], onDelete: Cascade)

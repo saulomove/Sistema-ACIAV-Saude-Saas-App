@@ -184,6 +184,12 @@ export class AuthService {
     return this.resetPassword(authUser.id);
   }
 
+  async resetPasswordByUser(userId: string) {
+    const authUser = await this.prisma.authUser.findFirst({ where: { userId } });
+    if (!authUser) throw new BadRequestException('Beneficiário não possui login cadastrado.');
+    return this.resetPassword(authUser.id);
+  }
+
   async me(authUserId: string) {
     const authUser = await this.prisma.authUser.findUnique({
       where: { id: authUserId },
