@@ -10,6 +10,10 @@ async function bootstrap() {
   }
   const app = await NestFactory.create(AppModule);
 
+  // Aumentar limite de body para importação de planilhas grandes
+  app.use(express.json({ limit: '10mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
   // Servir uploads como arquivos estáticos
   app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
