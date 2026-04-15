@@ -190,159 +190,214 @@ export class UsersService {
   ) {
     const results = { created: 0, skipped: 0, errors: [] as string[], loginsCreated: 0 };
 
-    // Build company lookup by corporateName (case-insensitive)
-    const companies = await this.prisma.company.findMany({
-      where: { unitId },
-      select: { id: true, corporateName: true },
-    });
+    // 1. Pre-load all data we need in bulk (avoid N+1 queries)
+    const [companies, existingUsersInUnit, existingAuthEmails] = await Promise.all([
+      this.prisma.company.findMany({
+        where: { unitId },
+        select: { id: true, corporateName: true },
+      }),
+      this.prisma.user.findMany({
+        where: { unitId },
+        select: { id: true, cpf: true, externalCode: true, companyId: true },
+      }),
+      this.prisma.authUser.findMany({
+        where: { role: 'patient' },
+        select: { email: true },
+      }),
+    ]);
+
     const companyMap = new Map<string, string>();
     for (const c of companies) {
       companyMap.set(c.corporateName.toUpperCase(), c.id);
     }
 
-    // Separate titulares and dependentes
+    const existingCpfSet = new Set<string>();
+    const externalCodeToUserId = new Map<string, string>();
+    const cpfToCompanyId = new Map<string, string | null>();
+    for (const eu of existingUsersInUnit) {
+      existingCpfSet.add(eu.cpf);
+      if (eu.externalCode) externalCodeToUserId.set(eu.externalCode, eu.id);
+      cpfToCompanyId.set(eu.cpf, eu.companyId);
+    }
+
+    const existingAuthSet = new Set<string>();
+    for (const a of existingAuthEmails) {
+      existingAuthSet.add(a.email);
+    }
+
+    // 2. Pre-compute a single bcrypt hash (all passwords are CPF, so we hash unique CPFs)
+    // Optimization: batch hash computation with lower rounds for import (user changes on first login)
+    const cpfsToHash = new Set<string>();
+    for (const u of users) {
+      const cpfClean = u.cpf.replace(/\D/g, '');
+      if (cpfClean && !existingCpfSet.has(cpfClean) && !existingAuthSet.has(cpfClean)) {
+        cpfsToHash.add(cpfClean);
+      }
+    }
+
+    // Hash all unique CPFs in parallel batches of 50
+    const hashMap = new Map<string, string>();
+    const cpfArray = Array.from(cpfsToHash);
+    for (let i = 0; i < cpfArray.length; i += 50) {
+      const batch = cpfArray.slice(i, i + 50);
+      const hashes = await Promise.all(batch.map((cpf) => bcrypt.hash(cpf, 8)));
+      batch.forEach((cpf, idx) => hashMap.set(cpf, hashes[idx]));
+    }
+
+    // 3. Separate titulares and dependentes
     const titulares = users.filter((u) => !u.parentExternalCode);
     const dependentes = users.filter((u) => !!u.parentExternalCode);
 
-    // Map externalCode → userId (for linking dependentes)
-    const externalCodeToUserId = new Map<string, string>();
+    // 4. Pass 1: Create titulares in batches
+    for (let i = 0; i < titulares.length; i += 100) {
+      const batch = titulares.slice(i, i + 100);
+      const ops: Array<Promise<void>> = [];
 
-    // Also load existing users with externalCode (in case some titulares already exist)
-    const existingUsers = await this.prisma.user.findMany({
-      where: { unitId, externalCode: { not: null } },
-      select: { id: true, externalCode: true },
-    });
-    for (const eu of existingUsers) {
-      if (eu.externalCode) externalCodeToUserId.set(eu.externalCode, eu.id);
+      for (const u of batch) {
+        ops.push((async () => {
+          try {
+            const cpfClean = u.cpf.replace(/\D/g, '');
+            if (!cpfClean) { results.errors.push(`"${u.fullName}": CPF vazio`); return; }
+
+            if (existingCpfSet.has(cpfClean)) {
+              if (u.externalCode) {
+                const existing = existingUsersInUnit.find((e) => e.cpf === cpfClean);
+                if (existing) externalCodeToUserId.set(u.externalCode, existing.id);
+              }
+              results.skipped++;
+              return;
+            }
+
+            const companyId = u.proponentName ? companyMap.get(u.proponentName.toUpperCase()) : undefined;
+            const birthDate = u.birthDate ? new Date(u.birthDate) : undefined;
+            const memberSince = u.memberSince ? new Date(u.memberSince) : undefined;
+
+            const user = await this.prisma.user.create({
+              data: {
+                unitId,
+                companyId: companyId || undefined,
+                externalCode: u.externalCode || undefined,
+                fullName: u.fullName,
+                cpf: cpfClean,
+                type: 'titular',
+                gender: u.gender || undefined,
+                birthDate,
+                phone: u.phone || undefined,
+                kinship: u.kinship || undefined,
+                billingName: u.billingName || undefined,
+                memberSince,
+              },
+            });
+
+            existingCpfSet.add(cpfClean);
+            if (u.externalCode) externalCodeToUserId.set(u.externalCode, user.id);
+            cpfToCompanyId.set(cpfClean, companyId ?? null);
+
+            if (!existingAuthSet.has(cpfClean)) {
+              const passwordHash = hashMap.get(cpfClean);
+              if (passwordHash) {
+                await this.prisma.authUser.create({
+                  data: {
+                    email: cpfClean,
+                    passwordHash,
+                    role: 'patient',
+                    unitId,
+                    companyId: companyId || undefined,
+                    userId: user.id,
+                  },
+                });
+                existingAuthSet.add(cpfClean);
+                results.loginsCreated++;
+              }
+            }
+
+            results.created++;
+          } catch {
+            results.errors.push(`CPF ${u.cpf}: erro ao importar titular`);
+          }
+        })());
+      }
+
+      await Promise.all(ops);
     }
 
-    // Pass 1: Create titulares
-    for (const u of titulares) {
-      try {
-        const cpfClean = u.cpf.replace(/\D/g, '');
-        if (!cpfClean) { results.errors.push(`"${u.fullName}": CPF vazio`); continue; }
+    // 5. Pass 2: Create dependentes in batches
+    for (let i = 0; i < dependentes.length; i += 100) {
+      const batch = dependentes.slice(i, i + 100);
+      const ops: Array<Promise<void>> = [];
 
-        const existing = await this.prisma.user.findFirst({ where: { cpf: cpfClean, unitId } });
-        if (existing) {
-          // Still map externalCode for dependents linking
-          if (u.externalCode && existing.id) externalCodeToUserId.set(u.externalCode, existing.id);
-          results.skipped++;
-          continue;
-        }
+      for (const u of batch) {
+        ops.push((async () => {
+          try {
+            const cpfClean = u.cpf.replace(/\D/g, '');
+            if (!cpfClean) { results.errors.push(`"${u.fullName}": CPF vazio`); return; }
 
-        const companyId = u.proponentName ? companyMap.get(u.proponentName.toUpperCase()) : undefined;
-        const birthDate = u.birthDate ? new Date(u.birthDate) : undefined;
-        const memberSince = u.memberSince ? new Date(u.memberSince) : undefined;
+            if (existingCpfSet.has(cpfClean)) {
+              results.skipped++;
+              return;
+            }
 
-        const user = await this.prisma.user.create({
-          data: {
-            unitId,
-            companyId: companyId || undefined,
-            externalCode: u.externalCode || undefined,
-            fullName: u.fullName,
-            cpf: cpfClean,
-            type: 'titular',
-            gender: u.gender || undefined,
-            birthDate,
-            phone: u.phone || undefined,
-            kinship: u.kinship || undefined,
-            billingName: u.billingName || undefined,
-            memberSince,
-          },
-        });
+            const parentId = u.parentExternalCode ? externalCodeToUserId.get(u.parentExternalCode) : undefined;
 
-        if (u.externalCode) externalCodeToUserId.set(u.externalCode, user.id);
+            let companyId: string | undefined;
+            if (parentId) {
+              const parentUser = existingUsersInUnit.find((e) => e.id === parentId);
+              companyId = parentUser?.companyId ?? undefined;
+              if (!companyId) companyId = cpfToCompanyId.get(parentUser?.cpf ?? '') ?? undefined;
+            }
+            if (!companyId && u.proponentName) {
+              companyId = companyMap.get(u.proponentName.toUpperCase());
+            }
 
-        // Create AuthUser login (CPF/CPF)
-        const existingAuth = await this.prisma.authUser.findUnique({ where: { email: cpfClean } });
-        if (!existingAuth) {
-          const passwordHash = await bcrypt.hash(cpfClean, 10);
-          await this.prisma.authUser.create({
-            data: {
-              email: cpfClean,
-              passwordHash,
-              role: 'patient',
-              unitId,
-              companyId: companyId || undefined,
-              userId: user.id,
-            },
-          });
-          results.loginsCreated++;
-        }
+            const birthDate = u.birthDate ? new Date(u.birthDate) : undefined;
+            const memberSince = u.memberSince ? new Date(u.memberSince) : undefined;
 
-        results.created++;
-      } catch {
-        results.errors.push(`CPF ${u.cpf}: erro ao importar titular`);
+            const user = await this.prisma.user.create({
+              data: {
+                unitId,
+                companyId: companyId || undefined,
+                externalCode: u.externalCode || undefined,
+                fullName: u.fullName,
+                cpf: cpfClean,
+                type: 'dependente',
+                parentId: parentId || undefined,
+                gender: u.gender || undefined,
+                birthDate,
+                phone: u.phone || undefined,
+                kinship: u.kinship || undefined,
+                billingName: u.billingName || undefined,
+                memberSince,
+              },
+            });
+
+            existingCpfSet.add(cpfClean);
+
+            if (!existingAuthSet.has(cpfClean)) {
+              const passwordHash = hashMap.get(cpfClean);
+              if (passwordHash) {
+                await this.prisma.authUser.create({
+                  data: {
+                    email: cpfClean,
+                    passwordHash,
+                    role: 'patient',
+                    unitId,
+                    companyId: companyId || undefined,
+                    userId: user.id,
+                  },
+                });
+                existingAuthSet.add(cpfClean);
+                results.loginsCreated++;
+              }
+            }
+
+            results.created++;
+          } catch {
+            results.errors.push(`CPF ${u.cpf}: erro ao importar dependente`);
+          }
+        })());
       }
-    }
 
-    // Pass 2: Create dependentes
-    for (const u of dependentes) {
-      try {
-        const cpfClean = u.cpf.replace(/\D/g, '');
-        if (!cpfClean) { results.errors.push(`"${u.fullName}": CPF vazio`); continue; }
-
-        const existing = await this.prisma.user.findFirst({ where: { cpf: cpfClean, unitId } });
-        if (existing) {
-          results.skipped++;
-          continue;
-        }
-
-        // Find parent by externalCode
-        const parentId = u.parentExternalCode ? externalCodeToUserId.get(u.parentExternalCode) : undefined;
-
-        // Get companyId from parent if available, or from proponentName
-        let companyId: string | undefined;
-        if (parentId) {
-          const parent = await this.prisma.user.findUnique({ where: { id: parentId }, select: { companyId: true } });
-          companyId = parent?.companyId ?? undefined;
-        }
-        if (!companyId && u.proponentName) {
-          companyId = companyMap.get(u.proponentName.toUpperCase());
-        }
-
-        const birthDate = u.birthDate ? new Date(u.birthDate) : undefined;
-        const memberSince = u.memberSince ? new Date(u.memberSince) : undefined;
-
-        const user = await this.prisma.user.create({
-          data: {
-            unitId,
-            companyId: companyId || undefined,
-            externalCode: u.externalCode || undefined,
-            fullName: u.fullName,
-            cpf: cpfClean,
-            type: 'dependente',
-            parentId: parentId || undefined,
-            gender: u.gender || undefined,
-            birthDate,
-            phone: u.phone || undefined,
-            kinship: u.kinship || undefined,
-            billingName: u.billingName || undefined,
-            memberSince,
-          },
-        });
-
-        // Create AuthUser login (CPF/CPF) for dependente too
-        const existingAuth = await this.prisma.authUser.findUnique({ where: { email: cpfClean } });
-        if (!existingAuth) {
-          const passwordHash = await bcrypt.hash(cpfClean, 10);
-          await this.prisma.authUser.create({
-            data: {
-              email: cpfClean,
-              passwordHash,
-              role: 'patient',
-              unitId,
-              companyId: companyId || undefined,
-              userId: user.id,
-            },
-          });
-          results.loginsCreated++;
-        }
-
-        results.created++;
-      } catch {
-        results.errors.push(`CPF ${u.cpf}: erro ao importar dependente`);
-      }
+      await Promise.all(ops);
     }
 
     return results;

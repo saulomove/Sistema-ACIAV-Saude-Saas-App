@@ -34,11 +34,17 @@ async function handler(req: NextRequest, { params }: { params: Promise<{ slug: s
   }
 
   try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 120000);
+
     const res = await fetch(`${INTERNAL_API}${path}${queryString}`, {
       method: req.method,
       headers,
       body,
+      signal: controller.signal,
     });
+
+    clearTimeout(timeout);
 
     const data = await res.json().catch(() => ({}));
     return NextResponse.json(data, { status: res.status });
@@ -52,13 +58,3 @@ export const POST = handler;
 export const PUT = handler;
 export const DELETE = handler;
 export const PATCH = handler;
-
-export const config = {
-  api: {
-    bodyParser: {
-      sizeLimit: '10mb',
-    },
-  },
-};
-
-export const maxDuration = 60;
