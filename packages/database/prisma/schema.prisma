@@ -24,14 +24,23 @@ model Unit {
 }
 
 model Company {
-  id            String   @id @default(uuid())
+  id            String    @id @default(uuid())
   unitId        String
+  externalCode  String?
   corporateName String
-  cnpj          String   @unique
-  adminEmail    String
-  status        Boolean  @default(true)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  tradeName     String?
+  cnpj          String    @unique
+  adminEmail    String?
+  address       String?
+  neighborhood  String?
+  zipCode       String?
+  city          String?
+  state         String?
+  phone         String?
+  memberSince   DateTime?
+  status        Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   unit  Unit   @relation(fields: [unitId], references: [id], onDelete: Cascade)
   users User[]

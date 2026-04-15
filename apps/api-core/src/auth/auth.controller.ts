@@ -95,6 +95,17 @@ export class AuthController {
     return this.authService.resetPasswordByProvider(providerId);
   }
 
+  @Post('reset-password/company/:companyId')
+  @UseGuards(AuthGuard('jwt'))
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { ttl: 60000, limit: 3 } })
+  async resetCompanyPassword(@Req() req: any, @Param('companyId') companyId: string) {
+    if (!['super_admin', 'admin_unit'].includes(req.user?.role)) {
+      throw new ForbiddenException('Acesso restrito a administradores.');
+    }
+    return this.authService.resetPasswordByCompany(companyId);
+  }
+
   @Patch('admin-users/:id/status')
   @UseGuards(AuthGuard('jwt'))
   toggleStatus(@Req() req: any, @Param('id') id: string, @Body() body: { status: boolean }) {

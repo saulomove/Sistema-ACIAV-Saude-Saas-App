@@ -1,5 +1,6 @@
 import { Controller, Get, Post, Put, Delete, Patch, Param, Body, Query, UseGuards, Req, ForbiddenException } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
+import { Throttle } from '@nestjs/throttler';
 import { CompaniesService } from './companies.service';
 
 @Controller('companies')
@@ -32,11 +33,41 @@ export class CompaniesController {
   create(@Req() req: any, @Body() body: any) {
     const data = {
       unitId: req.user.unitId ?? body.unitId,
+      externalCode: body.externalCode,
       corporateName: body.corporateName,
+      tradeName: body.tradeName,
       cnpj: body.cnpj,
       adminEmail: body.adminEmail,
+      address: body.address,
+      neighborhood: body.neighborhood,
+      zipCode: body.zipCode,
+      city: body.city,
+      state: body.state,
+      phone: body.phone,
+      memberSince: body.memberSince,
     };
     return this.companiesService.create(data);
+  }
+
+  @Post('import')
+  @Throttle({ default: { ttl: 60000, limit: 5 } })
+  importBatch(@Req() req: any, @Body() body: { companies: Array<Record<string, string>> }) {
+    const unitId = req.user.unitId ?? body.companies?.[0]?.unitId;
+    const companies = (body.companies ?? []).map((c) => ({
+      unitId,
+      externalCode: c.externalCode,
+      corporateName: c.corporateName,
+      tradeName: c.tradeName,
+      cnpj: c.cnpj,
+      adminEmail: c.adminEmail,
+      address: c.address,
+      neighborhood: c.neighborhood,
+      zipCode: c.zipCode,
+      city: c.city,
+      state: c.state,
+      memberSince: c.memberSince,
+    }));
+    return this.companiesService.importBatch(companies);
   }
 
   @Put(':id')
@@ -45,11 +76,12 @@ export class CompaniesController {
       const company = await this.companiesService.findOne(id);
       if (company && company.unitId !== req.user.unitId) throw new ForbiddenException('Acesso negado.');
     }
-    const data: any = {};
-    if (body.corporateName !== undefined) data.corporateName = body.corporateName;
-    if (body.adminEmail !== undefined) data.adminEmail = body.adminEmail;
-    if (body.status !== undefined) data.status = body.status;
-    return this.companiesService.update(id, data);
+    const data: Record<string, unknown> = {};
+    const allowed = ['corporateName', 'tradeName', 'adminEmail', 'address', 'neighborhood', 'zipCode', 'city', 'state', 'phone', 'externalCode', 'memberSince', 'status'];
+    for (const key of allowed) {
+      if (body[key] !== undefined) data[key] = body[key];
+    }
+    return this.companiesService.update(id, data as any);
   }
 
   @Patch(':id/status')
