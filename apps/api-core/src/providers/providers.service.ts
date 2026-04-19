@@ -1,7 +1,40 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
+
+const DISCOUNT_MIN = 5;
+const DISCOUNT_MAX = 20;
+
+function clampInt(v: unknown): number | null {
+  if (v === null || v === undefined || v === '') return null;
+  const n = Math.round(Number(v));
+  return Number.isFinite(n) ? n : null;
+}
+
+function normalizeDiscountRange(minRaw: unknown, maxRaw: unknown): { min: number | null; max: number | null } {
+  const min = clampInt(minRaw);
+  const max = clampInt(maxRaw);
+  if (min === null && max === null) return { min: null, max: null };
+  const effectiveMin = min ?? max ?? null;
+  const effectiveMax = max ?? min ?? null;
+  if (effectiveMin !== null && (effectiveMin < DISCOUNT_MIN || effectiveMin > DISCOUNT_MAX)) {
+    throw new BadRequestException(`Desconto mínimo deve estar entre ${DISCOUNT_MIN}% e ${DISCOUNT_MAX}%.`);
+  }
+  if (effectiveMax !== null && (effectiveMax < DISCOUNT_MIN || effectiveMax > DISCOUNT_MAX)) {
+    throw new BadRequestException(`Desconto máximo deve estar entre ${DISCOUNT_MIN}% e ${DISCOUNT_MAX}%.`);
+  }
+  if (effectiveMin !== null && effectiveMax !== null && effectiveMin > effectiveMax) {
+    throw new BadRequestException('Desconto mínimo não pode ser maior que o máximo.');
+  }
+  return { min: effectiveMin, max: effectiveMax };
+}
+
+function calcDiscounted(original: number, maxPercent: number | null): number {
+  if (!original || original <= 0 || maxPercent === null) return Number(original) || 0;
+  const value = original * (1 - maxPercent / 100);
+  return Math.round(value * 100) / 100;
+}
 
 @Injectable()
 export class ProvidersService {
@@ -35,7 +68,7 @@ export class ProvidersService {
         where,
         include: {
           _count: { select: { transactions: true, services: true } },
-          services: { select: { id: true, description: true, discountMaxPercent: true, originalPrice: true, discountedPrice: true } },
+          services: { select: { id: true, description: true, discountMinPercent: true, discountMaxPercent: true, originalPrice: true, discountedPrice: true } },
         },
       });
       const scored = rawData.map((p) => {
@@ -59,7 +92,7 @@ export class ProvidersService {
         where,
         include: {
           _count: { select: { transactions: true, services: true } },
-          services: { select: { id: true, description: true, discountMaxPercent: true, originalPrice: true, discountedPrice: true } },
+          services: { select: { id: true, description: true, discountMinPercent: true, discountMaxPercent: true, originalPrice: true, discountedPrice: true } },
         },
         orderBy: { rankingScore: 'desc' },
         skip,
@@ -225,20 +258,29 @@ export class ProvidersService {
   async createService(providerId: string, data: {
     description: string;
     originalPrice: number;
+    discountMinPercent?: number;
+    discountMaxPercent?: number;
     insurancePrice?: number;
-    discountedPrice: number;
+    discountedPrice?: number;
     discountType?: string;
     discountValue?: number;
   }) {
+    const range = normalizeDiscountRange(data.discountMinPercent, data.discountMaxPercent);
+    const originalPrice = Number(data.originalPrice) || 0;
+    const discountedPrice = data.discountedPrice !== undefined
+      ? Number(data.discountedPrice)
+      : calcDiscounted(originalPrice, range.max);
     return this.prisma.service.create({
       data: {
         providerId,
         description: data.description,
-        originalPrice: data.originalPrice,
+        originalPrice,
         insurancePrice: data.insurancePrice ?? 0,
-        discountedPrice: data.discountedPrice,
-        discountType: data.discountType ?? 'fixed',
-        discountValue: data.discountValue ?? 0,
+        discountedPrice,
+        discountType: data.discountType ?? 'percentage',
+        discountValue: data.discountValue ?? range.max ?? 0,
+        discountMinPercent: range.min,
+        discountMaxPercent: range.max,
       },
     });
   }
@@ -246,6 +288,8 @@ export class ProvidersService {
   async updateService(serviceId: string, data: {
     description?: string;
     originalPrice?: number;
+    discountMinPercent?: number;
+    discountMaxPercent?: number;
     insurancePrice?: number;
     discountedPrice?: number;
     discountType?: string;
@@ -253,11 +297,27 @@ export class ProvidersService {
   }) {
     const allowed: any = {};
     if (data.description !== undefined) allowed.description = data.description;
-    if (data.originalPrice !== undefined) allowed.originalPrice = data.originalPrice;
+    if (data.originalPrice !== undefined) allowed.originalPrice = Number(data.originalPrice);
     if (data.insurancePrice !== undefined) allowed.insurancePrice = data.insurancePrice;
-    if (data.discountedPrice !== undefined) allowed.discountedPrice = data.discountedPrice;
     if (data.discountType !== undefined) allowed.discountType = data.discountType;
     if (data.discountValue !== undefined) allowed.discountValue = data.discountValue;
+
+    const hasRange = data.discountMinPercent !== undefined || data.discountMaxPercent !== undefined;
+    if (hasRange) {
+      const current = await this.prisma.service.findUnique({ where: { id: serviceId } });
+      const range = normalizeDiscountRange(
+        data.discountMinPercent ?? current?.discountMinPercent ?? undefined,
+        data.discountMaxPercent ?? current?.discountMaxPercent ?? undefined,
+      );
+      allowed.discountMinPercent = range.min;
+      allowed.discountMaxPercent = range.max;
+      const originalPrice = allowed.originalPrice ?? Number(current?.originalPrice ?? 0);
+      if (data.discountedPrice === undefined && range.max != null) {
+        allowed.discountedPrice = calcDiscounted(originalPrice, range.max);
+      }
+    }
+
+    if (data.discountedPrice !== undefined) allowed.discountedPrice = Number(data.discountedPrice);
     return this.prisma.service.update({ where: { id: serviceId }, data: allowed });
   }
 

@@ -166,6 +166,8 @@ export class ProvidersController {
     const data = {
       description: body.description,
       originalPrice: body.originalPrice,
+      discountMinPercent: body.discountMinPercent,
+      discountMaxPercent: body.discountMaxPercent,
       insurancePrice: body.insurancePrice,
       discountedPrice: body.discountedPrice,
       discountType: body.discountType,
@@ -179,6 +181,8 @@ export class ProvidersController {
     const data = {
       description: body.description,
       originalPrice: body.originalPrice,
+      discountMinPercent: body.discountMinPercent,
+      discountMaxPercent: body.discountMaxPercent,
       insurancePrice: body.insurancePrice,
       discountedPrice: body.discountedPrice,
       discountType: body.discountType,

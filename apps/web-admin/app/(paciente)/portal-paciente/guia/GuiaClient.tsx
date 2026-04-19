@@ -8,6 +8,7 @@ interface Service {
   description: string;
   originalPrice: number;
   discountedPrice: number;
+  discountMinPercent?: number | null;
   discountMaxPercent?: number | null;
 }
 
@@ -75,29 +76,23 @@ function whatsLink(raw?: string | null) {
   return d ? `https://wa.me/55${d}` : null;
 }
 
-function fmtMoney(v: number) {
-  return Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-}
-
-function bestDiscount(services?: Service[]): { pct: number; min: number; max: number } {
-  if (!services || services.length === 0) return { pct: 0, min: 0, max: 0 };
-  let pct = 0;
-  let min = Infinity;
-  let max = 0;
+function bestDiscount(services?: Service[]): { minPct: number; maxPct: number; hasRange: boolean } {
+  if (!services || services.length === 0) return { minPct: 0, maxPct: 0, hasRange: false };
+  let lowest = Infinity;
+  let highest = 0;
+  let hasRange = false;
   for (const s of services) {
     const orig = Number(s.originalPrice);
     const disc = Number(s.discountedPrice);
-    if (orig > 0) {
-      const p = s.discountMaxPercent ?? Math.round(((orig - disc) / orig) * 100);
-      if (p > pct) pct = p;
-      if (disc > 0) {
-        if (disc < min) min = disc;
-        if (disc > max) max = disc;
-      }
-    }
+    if (orig <= 0) continue;
+    const maxP = s.discountMaxPercent ?? Math.round(((orig - disc) / orig) * 100);
+    const minP = s.discountMinPercent ?? maxP;
+    if (maxP > 0) hasRange = true;
+    if (minP < lowest) lowest = minP;
+    if (maxP > highest) highest = maxP;
   }
-  if (min === Infinity) min = 0;
-  return { pct, min, max };
+  if (lowest === Infinity) lowest = 0;
+  return { minPct: lowest, maxPct: highest, hasRange };
 }
 
 export default function GuiaClient({ providers, cities, categories, initialCity, initialCategory, initialSortBy }: Props) {
@@ -191,9 +186,10 @@ export default function GuiaClient({ providers, cities, categories, initialCity,
                       <Stethoscope size={24} />
                     </div>
                   )}
-                  {disc.pct > 0 && (
+                  {disc.hasRange && (
                     <div className="bg-emerald-50 text-emerald-600 px-3 py-1 rounded-full text-xs font-black border border-emerald-100 flex items-center gap-1">
-                      <Percent size={12} /> até {disc.pct}% OFF
+                      <Percent size={12} />
+                      {disc.minPct === disc.maxPct ? `${disc.maxPct}% OFF` : `${disc.minPct}% – ${disc.maxPct}% OFF`}
                     </div>
                   )}
                 </div>
@@ -203,10 +199,12 @@ export default function GuiaClient({ providers, cities, categories, initialCity,
                 </p>
                 {p.bio && <p className="text-sm text-slate-400 mt-2 line-clamp-2">{p.bio}</p>}
 
-                {disc.min > 0 && (
+                {disc.hasRange && (
                   <p className="text-xs text-slate-500 mt-2">
-                    Valores a partir de <span className="font-bold text-[#007178]">{fmtMoney(disc.min)}</span>
-                    {disc.max > disc.min && <> até <span className="font-bold text-[#007178]">{fmtMoney(disc.max)}</span></>}
+                    Desconto na plataforma ACIAV Saúde{' '}
+                    <span className="font-bold text-[#007178]">
+                      {disc.minPct === disc.maxPct ? `de ${disc.maxPct}%` : `de ${disc.minPct}% a ${disc.maxPct}%`}
+                    </span>
                   </p>
                 )}
 

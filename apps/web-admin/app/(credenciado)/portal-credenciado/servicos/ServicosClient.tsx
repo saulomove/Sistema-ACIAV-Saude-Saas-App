@@ -10,6 +10,8 @@ interface Service {
   discountedPrice: number;
   discountType: string;
   discountValue: number;
+  discountMinPercent?: number | null;
+  discountMaxPercent?: number | null;
 }
 
 function fmtMoney(v: number) {
@@ -19,6 +21,12 @@ function fmtMoney(v: number) {
 function discountPct(orig: number, disc: number) {
   if (!orig || orig === 0) return 0;
   return Math.round(((orig - disc) / orig) * 100);
+}
+
+function rangeLabel(s: Service): string {
+  const maxPct = s.discountMaxPercent ?? discountPct(Number(s.originalPrice), Number(s.discountedPrice));
+  const minPct = s.discountMinPercent ?? maxPct;
+  return minPct === maxPct ? `${maxPct}%` : `${minPct}% – ${maxPct}%`;
 }
 
 export default function ServicosClient({
@@ -58,34 +66,20 @@ export default function ServicosClient({
             <thead>
               <tr className="bg-slate-50 border-b border-gray-100 text-xs text-slate-500 uppercase tracking-wide">
                 <th className="text-left px-6 py-3 font-bold">Serviço</th>
-                <th className="text-right px-6 py-3 font-bold">Particular</th>
-                <th className="text-right px-6 py-3 font-bold">Convênio</th>
-                <th className="text-right px-6 py-3 font-bold">ACIAV</th>
-                <th className="text-right px-6 py-3 font-bold">Desconto</th>
-                <th className="text-right px-6 py-3 font-bold">Tipo</th>
+                <th className="text-right px-6 py-3 font-bold">Valor Particular</th>
+                <th className="text-right px-6 py-3 font-bold">Faixa de Desconto</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
               {initialServices.map((s) => (
                 <tr key={s.id} className="hover:bg-slate-50/50 transition-colors">
                   <td className="px-6 py-4 font-medium text-slate-700">{s.description}</td>
-                  <td className="px-6 py-4 text-right text-slate-400 line-through text-xs">
+                  <td className="px-6 py-4 text-right font-bold text-slate-700">
                     {fmtMoney(s.originalPrice)}
-                  </td>
-                  <td className="px-6 py-4 text-right text-blue-600 text-xs">
-                    {Number(s.insurancePrice) > 0 ? fmtMoney(s.insurancePrice) : '—'}
-                  </td>
-                  <td className="px-6 py-4 text-right font-bold text-[#007178] text-base">
-                    {fmtMoney(s.discountedPrice)}
                   </td>
                   <td className="px-6 py-4 text-right">
                     <span className="bg-emerald-100 text-emerald-700 text-xs font-bold px-2 py-1 rounded-full">
-                      -{discountPct(s.originalPrice, s.discountedPrice)}%
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <span className="bg-slate-100 text-slate-600 text-xs font-medium px-2 py-1 rounded-full">
-                      {s.discountType === 'percentage' ? 'Percentual' : 'Valor Fixo'}
+                      {rangeLabel(s)}
                     </span>
                   </td>
                 </tr>

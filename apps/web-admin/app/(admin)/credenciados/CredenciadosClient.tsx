@@ -20,6 +20,8 @@ interface Service {
   discountedPrice: number;
   discountType: string;
   discountValue: number;
+  discountMinPercent?: number | null;
+  discountMaxPercent?: number | null;
 }
 
 interface Provider {
@@ -66,7 +68,10 @@ const EMPTY_FORM = {
   email: '', bio: '',
 };
 
-const EMPTY_SERVICE_FORM = { description: '', originalPrice: '', insurancePrice: '', discountedPrice: '', discountType: 'fixed', discountValue: '' };
+const EMPTY_SERVICE_FORM = { description: '', originalPrice: '', discountMinPercent: '5', discountMaxPercent: '20' };
+
+const DISCOUNT_MIN = 5;
+const DISCOUNT_MAX = 20;
 
 function fmtMoney(v: number) {
   return Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -368,13 +373,14 @@ export default function CredenciadosClient({
 
   function openEditService(s: Service) {
     setEditingService(s);
+    const fallbackPct = s.originalPrice > 0 ? Math.round(((s.originalPrice - s.discountedPrice) / s.originalPrice) * 100) : 0;
+    const maxPct = s.discountMaxPercent ?? (fallbackPct || DISCOUNT_MAX);
+    const minPct = s.discountMinPercent ?? Math.min(maxPct, DISCOUNT_MIN);
     setServiceForm({
       description: s.description,
       originalPrice: String(s.originalPrice),
-      insurancePrice: String(s.insurancePrice ?? 0),
-      discountedPrice: String(s.discountedPrice),
-      discountType: s.discountType ?? 'fixed',
-      discountValue: s.discountValue ? String(s.discountValue) : '',
+      discountMinPercent: String(minPct),
+      discountMaxPercent: String(maxPct),
     });
     setServiceFormError('');
     setServiceModalOpen(true);
@@ -383,36 +389,36 @@ export default function CredenciadosClient({
   async function handleSaveService() {
     if (!serviceForm.description.trim()) { setServiceFormError('Informe a descrição do serviço.'); return; }
     const orig = parseFloat(serviceForm.originalPrice.replace(',', '.'));
-    const ins = parseFloat(serviceForm.insurancePrice.replace(',', '.') || '0');
-    const disc = parseFloat(serviceForm.discountedPrice.replace(',', '.'));
+    const minPct = parseInt(serviceForm.discountMinPercent, 10);
+    const maxPct = parseInt(serviceForm.discountMaxPercent, 10);
     if (isNaN(orig) || orig <= 0) { setServiceFormError('Informe um valor particular válido.'); return; }
-    if (isNaN(disc) || disc < 0) { setServiceFormError('Informe um valor ACIAV válido.'); return; }
-    if (disc > orig) { setServiceFormError('Valor ACIAV não pode ser maior que o valor particular.'); return; }
+    if (isNaN(minPct) || minPct < DISCOUNT_MIN || minPct > DISCOUNT_MAX) {
+      setServiceFormError(`Desconto mínimo deve estar entre ${DISCOUNT_MIN}% e ${DISCOUNT_MAX}%.`);
+      return;
+    }
+    if (isNaN(maxPct) || maxPct < DISCOUNT_MIN || maxPct > DISCOUNT_MAX) {
+      setServiceFormError(`Desconto máximo deve estar entre ${DISCOUNT_MIN}% e ${DISCOUNT_MAX}%.`);
+      return;
+    }
+    if (minPct > maxPct) { setServiceFormError('Desconto mínimo não pode ser maior que o máximo.'); return; }
 
     setSavingService(true);
     setServiceFormError('');
     try {
-      const discVal = parseFloat(serviceForm.discountValue.replace(',', '.') || '0');
+      const payload = {
+        description: serviceForm.description,
+        originalPrice: orig,
+        discountMinPercent: minPct,
+        discountMaxPercent: maxPct,
+        discountType: 'percentage',
+        discountValue: maxPct,
+      };
       if (editingService) {
-        const updated = await api.put(`/providers/services/${editingService.id}`, {
-          description: serviceForm.description,
-          originalPrice: orig,
-          insurancePrice: isNaN(ins) ? 0 : ins,
-          discountedPrice: disc,
-          discountType: serviceForm.discountType,
-          discountValue: isNaN(discVal) ? 0 : discVal,
-        }) as Service;
+        const updated = await api.put(`/providers/services/${editingService.id}`, payload) as Service;
         setServices((prev) => prev.map((s) => (s.id === editingService.id ? updated : s)));
         showServiceToast('Serviço atualizado!');
       } else {
-        const created = await api.post(`/providers/${drawerProvider!.id}/services`, {
-          description: serviceForm.description,
-          originalPrice: orig,
-          insurancePrice: isNaN(ins) ? 0 : ins,
-          discountedPrice: disc,
-          discountType: serviceForm.discountType,
-          discountValue: isNaN(discVal) ? 0 : discVal,
-        }) as Service;
+        const created = await api.post(`/providers/${drawerProvider!.id}/services`, payload) as Service;
         setServices((prev) => [...prev, created]);
         showServiceToast('Serviço cadastrado!');
       }
@@ -843,21 +849,18 @@ export default function CredenciadosClient({
                     </div>
                   ) : (
                     <div className="space-y-3">
-                      {services.map((s) => (
+                      {services.map((s) => {
+                        const maxPct = s.discountMaxPercent ?? discountPct(s.originalPrice, s.discountedPrice);
+                        const minPct = s.discountMinPercent ?? maxPct;
+                        const rangeLabel = minPct === maxPct ? `${maxPct}%` : `${minPct}% – ${maxPct}%`;
+                        return (
                         <div key={s.id} className="bg-slate-50 rounded-xl p-4 flex items-start justify-between gap-3">
                           <div className="flex-1 min-w-0">
                             <p className="font-semibold text-slate-800 text-sm">{s.description}</p>
                             <div className="flex items-center gap-3 mt-2 flex-wrap">
-                              <span className="text-xs text-slate-400 line-through">{fmtMoney(s.originalPrice)}</span>
-                              {Number(s.insurancePrice) > 0 && (
-                                <span className="text-xs text-blue-600">Conv: {fmtMoney(s.insurancePrice)}</span>
-                              )}
-                              <span className="text-sm font-bold text-[#007178]">{fmtMoney(s.discountedPrice)}</span>
+                              <span className="text-xs text-slate-400">Particular: <span className="font-bold text-slate-600">{fmtMoney(s.originalPrice)}</span></span>
                               <span className="bg-emerald-100 text-emerald-700 text-xs font-bold px-2 py-0.5 rounded-full">
-                                -{discountPct(s.originalPrice, s.discountedPrice)}%
-                              </span>
-                              <span className="bg-slate-100 text-slate-500 text-xs px-2 py-0.5 rounded-full">
-                                {s.discountType === 'percentage' ? 'Percentual' : 'Valor Fixo'}
+                                Desconto: {rangeLabel}
                               </span>
                             </div>
                           </div>
@@ -882,7 +885,8 @@ export default function CredenciadosClient({
                             </button>
                           </div>
                         </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </div>
@@ -915,73 +919,45 @@ export default function CredenciadosClient({
                   className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-slate-50"
                 />
               </div>
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1.5">Particular (R$)</label>
-                  <input
-                    type="number" step="0.01" min="0"
-                    value={serviceForm.originalPrice}
-                    onChange={(e) => setServiceForm((f) => ({ ...f, originalPrice: e.target.value }))}
-                    placeholder="200.00"
-                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-slate-50 text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1.5">Convênio (R$)</label>
-                  <input
-                    type="number" step="0.01" min="0"
-                    value={serviceForm.insurancePrice}
-                    onChange={(e) => setServiceForm((f) => ({ ...f, insurancePrice: e.target.value }))}
-                    placeholder="180.00"
-                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-slate-50 text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1.5">ACIAV (R$)</label>
-                  <input
-                    type="number" step="0.01" min="0"
-                    value={serviceForm.discountedPrice}
-                    onChange={(e) => setServiceForm((f) => ({ ...f, discountedPrice: e.target.value }))}
-                    placeholder="140.00"
-                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-slate-50 text-sm"
-                  />
-                </div>
-              </div>
               <div>
-                <label className="block text-sm font-bold text-slate-700 mb-1.5">Tipo de Desconto</label>
-                <div className="flex gap-3">
-                  <label className={`flex-1 flex items-center gap-2 p-2.5 rounded-xl border-2 cursor-pointer transition-all text-sm ${serviceForm.discountType === 'fixed' ? 'border-primary bg-primary/5' : 'border-gray-200 hover:border-primary/40'}`}>
-                    <input type="radio" name="svcDiscountType" value="fixed" checked={serviceForm.discountType === 'fixed'} onChange={(e) => setServiceForm((f) => ({ ...f, discountType: e.target.value }))} className="accent-primary" />
-                    <span className="font-medium text-slate-700">Valor Fixo (R$)</span>
-                  </label>
-                  <label className={`flex-1 flex items-center gap-2 p-2.5 rounded-xl border-2 cursor-pointer transition-all text-sm ${serviceForm.discountType === 'percentage' ? 'border-primary bg-primary/5' : 'border-gray-200 hover:border-primary/40'}`}>
-                    <input type="radio" name="svcDiscountType" value="percentage" checked={serviceForm.discountType === 'percentage'} onChange={(e) => setServiceForm((f) => ({ ...f, discountType: e.target.value }))} className="accent-primary" />
-                    <span className="font-medium text-slate-700">Percentual (%)</span>
-                  </label>
-                </div>
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                  {serviceForm.discountType === 'percentage' ? 'Percentual de Desconto (%)' : 'Valor do Desconto (R$)'}
-                </label>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">Valor Particular (R$)</label>
                 <input
                   type="number" step="0.01" min="0"
-                  value={serviceForm.discountValue}
-                  onChange={(e) => setServiceForm((f) => ({ ...f, discountValue: e.target.value }))}
+                  value={serviceForm.originalPrice}
+                  onChange={(e) => setServiceForm((f) => ({ ...f, originalPrice: e.target.value }))}
+                  placeholder="200.00"
                   className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-slate-50 text-sm"
-                  placeholder={serviceForm.discountType === 'percentage' ? 'Ex: 30' : 'Ex: 50.00'}
                 />
+                <p className="text-xs text-slate-400 mt-1">Valor cheio cobrado aos pacientes sem convênio.</p>
               </div>
-              {serviceForm.originalPrice && serviceForm.discountedPrice && (
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5">% Desconto mínimo</label>
+                  <input
+                    type="number" step="1" min={DISCOUNT_MIN} max={DISCOUNT_MAX}
+                    value={serviceForm.discountMinPercent}
+                    onChange={(e) => setServiceForm((f) => ({ ...f, discountMinPercent: e.target.value }))}
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-slate-50 text-sm"
+                    placeholder="5"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5">% Desconto máximo</label>
+                  <input
+                    type="number" step="1" min={DISCOUNT_MIN} max={DISCOUNT_MAX}
+                    value={serviceForm.discountMaxPercent}
+                    onChange={(e) => setServiceForm((f) => ({ ...f, discountMaxPercent: e.target.value }))}
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-slate-50 text-sm"
+                    placeholder="20"
+                  />
+                </div>
+              </div>
+              <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 text-xs text-blue-700">
+                O desconto aplicado ao paciente ficará entre {DISCOUNT_MIN}% e {DISCOUNT_MAX}% do valor particular. O valor do convênio é informado no atendimento.
+              </div>
+              {serviceForm.originalPrice && serviceForm.discountMaxPercent && !isNaN(parseFloat(serviceForm.originalPrice)) && (
                 <div className="bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-3 text-sm text-emerald-700">
-                  Desconto:{' '}
-                  <strong>
-                    {discountPct(parseFloat(serviceForm.originalPrice), parseFloat(serviceForm.discountedPrice))}%
-                  </strong>
-                  {' '}— Economia de{' '}
-                  <strong>
-                    {fmtMoney(parseFloat(serviceForm.originalPrice) - parseFloat(serviceForm.discountedPrice))}
-                  </strong>
+                  Valor ACIAV (desconto máx): <strong>{fmtMoney(parseFloat(serviceForm.originalPrice) * (1 - parseInt(serviceForm.discountMaxPercent, 10) / 100))}</strong>
                 </div>
               )}
               {serviceFormError && (
