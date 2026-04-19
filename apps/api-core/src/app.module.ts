@@ -17,6 +17,7 @@ import { AuditInterceptor } from './audit/audit.interceptor';
 import { ExportModule } from './export/export.module';
 import { EmailModule } from './email/email.module';
 import { PortalPacienteModule } from './portal-paciente/portal-paciente.module';
+import { PortalRhModule } from './portal-rh/portal-rh.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { PortalPacienteModule } from './portal-paciente/portal-paciente.module';
     RewardsModule,
     ExportModule,
     PortalPacienteModule,
+    PortalRhModule,
   ],
   controllers: [AppController],
   providers: [

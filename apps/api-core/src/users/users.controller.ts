@@ -103,7 +103,7 @@ export class UsersController {
   }
 
   @Post()
-  create(@Req() req: any, @Body() body: any) {
+  create(@Req() req: any, @Query('confirmTransfer') confirmTransfer?: string, @Body() body: any = {}) {
     const data = {
       unitId: req.user.unitId ?? body.unitId,
       companyId: body.companyId || undefined,
@@ -118,12 +118,19 @@ export class UsersController {
       kinship: body.kinship?.trim() || undefined,
       billingName: body.billingName?.trim() || undefined,
       memberSince: body.memberSince?.trim() || undefined,
+      cardTypeOverride: body.cardTypeOverride?.trim() || undefined,
+      confirmTransfer: confirmTransfer === 'true' || body.confirmTransfer === true,
     };
     return this.usersService.create(data);
   }
 
   @Put(':id')
-  async update(@Req() req: any, @Param('id') id: string, @Body() body: any) {
+  async update(
+    @Req() req: any,
+    @Param('id') id: string,
+    @Query('confirmTransfer') confirmTransfer?: string,
+    @Body() body: any = {},
+  ) {
     if (req.user.role !== 'super_admin') {
       const user = await this.usersService.findOne(id);
       if (user && user.unitId !== req.user.unitId) throw new ForbiddenException('Acesso negado.');
@@ -139,6 +146,11 @@ export class UsersController {
     if (body.externalCode !== undefined) data.externalCode = body.externalCode;
     if (body.birthDate !== undefined) data.birthDate = body.birthDate;
     if (body.memberSince !== undefined) data.memberSince = body.memberSince;
+    if (body.cardTypeOverride !== undefined) {
+      const v = (body.cardTypeOverride ?? '').toString().trim();
+      data.cardTypeOverride = v === '' ? null : v;
+    }
+    data.confirmTransfer = confirmTransfer === 'true' || body.confirmTransfer === true;
     return this.usersService.update(id, data as any);
   }
 
@@ -149,6 +161,30 @@ export class UsersController {
       if (user && user.unitId !== req.user.unitId) throw new ForbiddenException('Acesso negado.');
     }
     return this.usersService.update(id, { status: body.status });
+  }
+
+  @Post(':id/inactivate')
+  async inactivate(@Req() req: any, @Param('id') id: string, @Body() body: { reason: string }) {
+    if (req.user.role !== 'super_admin') {
+      const user = await this.usersService.findOne(id);
+      if (!user || user.unitId !== req.user.unitId) throw new ForbiddenException('Acesso negado.');
+      if (req.user.role === 'rh' && user.companyId !== req.user.companyId) {
+        throw new ForbiddenException('Acesso negado.');
+      }
+    }
+    return this.usersService.inactivateWithReason(id, body?.reason ?? '');
+  }
+
+  @Post(':id/reactivate')
+  async reactivate(@Req() req: any, @Param('id') id: string) {
+    if (req.user.role !== 'super_admin') {
+      const user = await this.usersService.findOne(id);
+      if (!user || user.unitId !== req.user.unitId) throw new ForbiddenException('Acesso negado.');
+      if (req.user.role === 'rh' && user.companyId !== req.user.companyId) {
+        throw new ForbiddenException('Acesso negado.');
+      }
+    }
+    return this.usersService.reactivate(id);
   }
 
   @Delete(':id')

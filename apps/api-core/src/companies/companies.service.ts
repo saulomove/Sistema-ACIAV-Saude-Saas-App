@@ -48,6 +48,8 @@ export class CompaniesService {
     state?: string;
     phone?: string;
     memberSince?: string;
+    dependentPaymentMode?: string;
+    defaultCardType?: string;
   }) {
     const memberSince = data.memberSince ? new Date(data.memberSince) : undefined;
 
@@ -66,6 +68,8 @@ export class CompaniesService {
         state: data.state || undefined,
         phone: data.phone || undefined,
         memberSince,
+        dependentPaymentMode: data.dependentPaymentMode || undefined,
+        defaultCardType: data.defaultCardType || undefined,
       },
     });
 
@@ -104,6 +108,8 @@ export class CompaniesService {
     externalCode?: string;
     memberSince?: string;
     status?: boolean;
+    dependentPaymentMode?: string;
+    defaultCardType?: string;
   }) {
     const updateData: Record<string, unknown> = {};
     if (data.corporateName !== undefined) updateData.corporateName = data.corporateName;
@@ -118,6 +124,14 @@ export class CompaniesService {
     if (data.externalCode !== undefined) updateData.externalCode = data.externalCode;
     if (data.memberSince !== undefined) updateData.memberSince = new Date(data.memberSince);
     if (data.status !== undefined) updateData.status = data.status;
+    if (data.dependentPaymentMode !== undefined) {
+      const v = (data.dependentPaymentMode || 'titular').toLowerCase();
+      updateData.dependentPaymentMode = ['titular', 'empresa'].includes(v) ? v : 'titular';
+    }
+    if (data.defaultCardType !== undefined) {
+      const v = (data.defaultCardType || 'app').toLowerCase();
+      updateData.defaultCardType = ['app', 'physical'].includes(v) ? v : 'app';
+    }
 
     return this.prisma.company.update({ where: { id }, data: updateData });
   }

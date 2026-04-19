@@ -31,6 +31,10 @@ interface User {
   billingName?: string | null;
   memberSince?: string | null;
   companyId?: string | null;
+  cardTypeOverride?: 'app' | 'physical' | null;
+  inactivationReason?: string | null;
+  inactivatedAt?: string | null;
+  inactivationLockUntil?: string | null;
   pointsBalance: number;
   status: boolean;
   company?: { corporateName: string } | null;
@@ -56,6 +60,7 @@ const EMPTY_FORM = {
   fullName: '', cpf: '', type: 'titular', companyId: '', parentId: '',
   externalCode: '', gender: '', birthDate: '', phone: '',
   kinship: '', billingName: '', memberSince: '',
+  cardTypeOverride: '' as '' | 'app' | 'physical',
 };
 
 function formatCpf(value: string) {
@@ -197,6 +202,19 @@ export default function BeneficiariosClient({
   const [resetResult, setResetResult] = useState<{ tempPassword: string; email: string } | null>(null);
   const [copied, setCopied] = useState(false);
 
+  const [inactivateTarget, setInactivateTarget] = useState<User | null>(null);
+  const [inactivateReason, setInactivateReason] = useState('');
+  const [inactivateError, setInactivateError] = useState('');
+  const [inactivateSubmitting, setInactivateSubmitting] = useState(false);
+
+  const [conflictInfo, setConflictInfo] = useState<{
+    existingUserId: string;
+    existingCompany: string | null;
+    locked: boolean;
+    lockUntil: string | null;
+    message: string;
+  } | null>(null);
+
   const companyList = companies as Company[];
   const userList = users as User[];
   const titulares = userList.filter((u) => u.type === 'titular' && u.status);
@@ -279,12 +297,31 @@ export default function BeneficiariosClient({
       kinship: u.kinship ?? '',
       billingName: u.billingName ?? '',
       memberSince: u.memberSince ? u.memberSince.slice(0, 10) : '',
+      cardTypeOverride: (u.cardTypeOverride ?? '') as '' | 'app' | 'physical',
     });
     setError('');
     setModalOpen(true);
   }
 
-  async function handleSave() {
+  async function submitUserPayload(
+    editing: boolean,
+    payload: Record<string, unknown>,
+    confirmTransfer: boolean,
+  ) {
+    const qs = confirmTransfer ? '?confirmTransfer=true' : '';
+    const url = editing
+      ? `/internal/api/users/${editingId}${qs}`
+      : `/internal/api/users${qs}`;
+    const res = await fetch(url, {
+      method: editing ? 'PUT' : 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json().catch(() => ({}));
+    return { ok: res.ok, status: res.status, data };
+  }
+
+  async function handleSave(confirmTransfer = false) {
     if (!form.fullName.trim() || !form.cpf.trim()) {
       setError('Nome e CPF são obrigatórios.');
       return;
@@ -302,21 +339,39 @@ export default function BeneficiariosClient({
         birthDate: form.birthDate || undefined,
         memberSince: form.memberSince || undefined,
         companyId: form.companyId || undefined,
+        cardTypeOverride: form.cardTypeOverride === '' ? null : form.cardTypeOverride,
       };
 
-      if (editingId) {
-        await api.put(`/users/${editingId}`, payload);
-        setModalOpen(false);
-        if (drawerUser && drawerUser.id === editingId) {
-          setDrawerUser({ ...drawerUser, ...payload } as User);
-        }
-      } else {
+      if (!editingId) {
         payload.unitId = unitId;
         payload.cpf = form.cpf.replace(/\D/g, '');
         payload.type = form.type;
         payload.parentId = form.parentId || undefined;
-        await api.post('/users', payload);
-        setModalOpen(false);
+      }
+
+      const result = await submitUserPayload(!!editingId, payload, confirmTransfer);
+      if (!result.ok) {
+        const body = (result.data?.message && typeof result.data.message === 'object')
+          ? result.data.message
+          : result.data;
+        if (result.status === 409 && body?.conflict) {
+          setConflictInfo({
+            existingUserId: body.existingUserId,
+            existingCompany: body.existingCompany?.corporateName || null,
+            locked: !!body.locked,
+            lockUntil: body.inactivationLockUntil || null,
+            message: body.message || 'Conflito de cadastro.',
+          });
+          return;
+        }
+        setError(body?.message || `Erro ${result.status}`);
+        return;
+      }
+
+      setModalOpen(false);
+      setConflictInfo(null);
+      if (editingId && drawerUser && drawerUser.id === editingId) {
+        setDrawerUser({ ...drawerUser, ...payload } as User);
       }
       startTransition(() => router.refresh());
     } catch (e: unknown) {
@@ -328,22 +383,53 @@ export default function BeneficiariosClient({
 
   async function handleToggleStatus(u: User, e?: React.MouseEvent) {
     e?.stopPropagation();
+    // Reativar direto; inativação passa pelo modal com motivo
+    if (u.status) {
+      openInactivate(u);
+      return;
+    }
     try {
-      await api.patch(`/users/${u.id}/status`, { status: !u.status });
+      await api.post(`/users/${u.id}/reactivate`, {});
       startTransition(() => router.refresh());
-    } catch {
-      alert('Erro ao alterar status.');
+    } catch (e2: unknown) {
+      alert(e2 instanceof Error ? e2.message : 'Erro ao reativar.');
     }
   }
 
-  async function handleDelete(u: User, e: React.MouseEvent) {
-    e.stopPropagation();
-    if (!confirm(`Inativar "${u.fullName}"? O histórico será preservado.`)) return;
+  function openInactivate(u: User, e?: React.MouseEvent) {
+    e?.stopPropagation();
+    setInactivateTarget(u);
+    setInactivateReason('');
+    setInactivateError('');
+  }
+
+  async function handleInactivateSubmit() {
+    if (!inactivateTarget) return;
+    const reason = inactivateReason.trim();
+    if (reason.length < 3) {
+      setInactivateError('Motivo obrigatório (mínimo 3 caracteres).');
+      return;
+    }
+    setInactivateSubmitting(true);
+    setInactivateError('');
     try {
-      await api.delete(`/users/${u.id}`);
+      const res = await fetch(`/internal/api/users/${inactivateTarget.id}/inactivate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setInactivateError(data.message || 'Erro ao inativar.');
+        return;
+      }
+      setInactivateTarget(null);
+      setInactivateReason('');
       startTransition(() => router.refresh());
     } catch {
-      alert('Erro ao inativar beneficiário.');
+      setInactivateError('Erro de conexão.');
+    } finally {
+      setInactivateSubmitting(false);
     }
   }
 
@@ -561,13 +647,15 @@ export default function BeneficiariosClient({
                         >
                           <Pencil size={17} />
                         </button>
-                        <button
-                          onClick={(e) => handleDelete(u, e)}
-                          className="text-slate-400 hover:text-red-500 p-2 rounded-lg hover:bg-red-50 transition-colors"
-                          title="Inativar"
-                        >
-                          <Trash2 size={17} />
-                        </button>
+                        {u.status && (
+                          <button
+                            onClick={(e) => openInactivate(u, e)}
+                            className="text-slate-400 hover:text-red-500 p-2 rounded-lg hover:bg-red-50 transition-colors"
+                            title="Inativar com motivo"
+                          >
+                            <Trash2 size={17} />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -1097,6 +1185,20 @@ export default function BeneficiariosClient({
                 className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-slate-50"
               />
             </div>
+
+            <div>
+              <label className="block text-sm font-bold text-slate-700 mb-1">Tipo de Cartão</label>
+              <p className="text-xs text-slate-400 mb-1.5">Sobrescreve o padrão da empresa. Deixe em branco para herdar.</p>
+              <select
+                value={form.cardTypeOverride}
+                onChange={(e) => setForm({ ...form, cardTypeOverride: e.target.value as '' | 'app' | 'physical' })}
+                className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-slate-50"
+              >
+                <option value="">Herdar da empresa</option>
+                <option value="app">Somente aplicativo</option>
+                <option value="physical">Físico + aplicativo</option>
+              </select>
+            </div>
           </div>
 
           {error && (
@@ -1117,7 +1219,7 @@ export default function BeneficiariosClient({
               Cancelar
             </button>
             <button
-              onClick={handleSave}
+              onClick={() => handleSave(false)}
               disabled={saving}
               className="flex-1 bg-primary text-white py-2.5 rounded-xl font-medium hover:bg-primary-dark transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
             >
@@ -1127,6 +1229,108 @@ export default function BeneficiariosClient({
           </div>
         </div>
       </Modal>
+
+      {inactivateTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+              <h3 className="text-base font-bold text-slate-800">Inativar beneficiário</h3>
+              <button
+                onClick={() => { setInactivateTarget(null); setInactivateReason(''); setInactivateError(''); }}
+                className="text-slate-400 hover:text-slate-600"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="px-6 py-5 space-y-4">
+              <p className="text-sm text-slate-600">
+                Você está inativando <strong>{inactivateTarget.fullName}</strong>. O beneficiário ficará bloqueado
+                para novas transferências por <strong>30 dias</strong>.
+              </p>
+              <div>
+                <label className="block text-xs font-bold text-slate-600 mb-1.5">Motivo *</label>
+                <textarea
+                  value={inactivateReason}
+                  onChange={(e) => setInactivateReason(e.target.value)}
+                  required
+                  rows={3}
+                  className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-300 focus:border-red-400"
+                  placeholder="Ex.: desligamento em 01/04/2026"
+                />
+              </div>
+              {inactivateError && (
+                <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-3 py-2 rounded-lg">{inactivateError}</div>
+              )}
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  onClick={() => { setInactivateTarget(null); setInactivateReason(''); setInactivateError(''); }}
+                  disabled={inactivateSubmitting}
+                  className="px-4 py-2 text-sm font-bold text-slate-600 hover:text-slate-800 disabled:opacity-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleInactivateSubmit}
+                  disabled={inactivateSubmitting || inactivateReason.trim().length < 3}
+                  className="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 disabled:opacity-60 text-white font-bold px-4 py-2 rounded-lg text-sm"
+                >
+                  {inactivateSubmitting && <Loader2 size={14} className="animate-spin" />}
+                  Confirmar inativação
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {conflictInfo && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+              <h3 className="text-base font-bold text-slate-800">
+                {conflictInfo.locked ? 'Transferência bloqueada' : 'CPF já cadastrado em outra empresa'}
+              </h3>
+              <button onClick={() => setConflictInfo(null)} className="text-slate-400 hover:text-slate-600">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="px-6 py-5 space-y-4 text-sm text-slate-600">
+              <p>
+                {conflictInfo.existingCompany
+                  ? <>Este CPF já pertence a <strong>{conflictInfo.existingCompany}</strong>.</>
+                  : <>{conflictInfo.message}</>}
+              </p>
+              {conflictInfo.locked && conflictInfo.lockUntil && (
+                <div className="bg-amber-50 border border-amber-200 text-amber-800 text-sm px-3 py-2 rounded-lg">
+                  Este beneficiário foi inativado recentemente e está bloqueado para nova empresa até{' '}
+                  <strong>{formatDate(conflictInfo.lockUntil)}</strong>.
+                </div>
+              )}
+              {!conflictInfo.locked && (
+                <p>Deseja transferir o beneficiário para a empresa atual? O histórico de transações é preservado.</p>
+              )}
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  onClick={() => setConflictInfo(null)}
+                  className="px-4 py-2 text-sm font-bold text-slate-600 hover:text-slate-800"
+                >
+                  Cancelar
+                </button>
+                {!conflictInfo.locked && (
+                  <button
+                    onClick={() => { setConflictInfo(null); handleSave(true); }}
+                    disabled={saving}
+                    className="inline-flex items-center gap-2 bg-primary hover:bg-primary-dark disabled:opacity-60 text-white font-bold px-4 py-2 rounded-lg text-sm"
+                  >
+                    {saving && <Loader2 size={14} className="animate-spin" />}
+                    Transferir para esta empresa
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

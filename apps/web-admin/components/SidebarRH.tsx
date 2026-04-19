@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { LayoutDashboard, Users, UserPlus, FileSpreadsheet, ActivitySquare, LogOut, Menu, X } from 'lucide-react';
+import { LayoutDashboard, Users, UserPlus, FileSpreadsheet, ActivitySquare, LogOut, Menu, Stethoscope, X } from 'lucide-react';
 import Image from 'next/image';
 import clsx from 'clsx';
 import { useState } from 'react';
@@ -11,6 +11,7 @@ const menuItems = [
   { name: 'Dashboard', icon: LayoutDashboard, href: '/portal-rh' },
   { name: 'Colaboradores', icon: Users, href: '/portal-rh/colaboradores' },
   { name: 'Dependentes', icon: UserPlus, href: '/portal-rh/dependentes' },
+  { name: 'Credenciados', icon: Stethoscope, href: '/portal-rh/credenciados' },
   { name: 'Importar Planilha', icon: FileSpreadsheet, href: '/portal-rh/importar' },
   { name: 'Relatórios', icon: ActivitySquare, href: '/portal-rh/relatorios' },
 ];

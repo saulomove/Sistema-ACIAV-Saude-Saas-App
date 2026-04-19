@@ -45,6 +45,8 @@ export class CompaniesController {
       state: body.state,
       phone: body.phone,
       memberSince: body.memberSince,
+      dependentPaymentMode: body.dependentPaymentMode,
+      defaultCardType: body.defaultCardType,
     };
     return this.companiesService.create(data);
   }
@@ -77,7 +79,11 @@ export class CompaniesController {
       if (company && company.unitId !== req.user.unitId) throw new ForbiddenException('Acesso negado.');
     }
     const data: Record<string, unknown> = {};
-    const allowed = ['corporateName', 'tradeName', 'adminEmail', 'address', 'neighborhood', 'zipCode', 'city', 'state', 'phone', 'externalCode', 'memberSince', 'status'];
+    const allowed = [
+      'corporateName', 'tradeName', 'adminEmail', 'address', 'neighborhood',
+      'zipCode', 'city', 'state', 'phone', 'externalCode', 'memberSince', 'status',
+      'dependentPaymentMode', 'defaultCardType',
+    ];
     for (const key of allowed) {
       if (body[key] !== undefined) data[key] = body[key];
     }

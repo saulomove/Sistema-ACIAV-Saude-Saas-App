@@ -27,6 +27,8 @@ interface Company {
   phone?: string | null;
   memberSince?: string | null;
   status: boolean;
+  dependentPaymentMode?: 'titular' | 'empresa' | null;
+  defaultCardType?: 'app' | 'physical' | null;
   _count?: { users: number };
 }
 
@@ -53,6 +55,8 @@ const EMPTY_FORM = {
   externalCode: '', corporateName: '', tradeName: '', cnpj: '',
   adminEmail: '', address: '', neighborhood: '', zipCode: '',
   city: '', state: '', phone: '', memberSince: '',
+  dependentPaymentMode: 'titular' as 'titular' | 'empresa',
+  defaultCardType: 'app' as 'app' | 'physical',
 };
 
 const STATES = [
@@ -249,6 +253,8 @@ export default function EmpresasClient({
       state: c.state ?? '',
       phone: c.phone ?? '',
       memberSince: c.memberSince ? c.memberSince.slice(0, 10) : '',
+      dependentPaymentMode: (c.dependentPaymentMode ?? 'titular') as 'titular' | 'empresa',
+      defaultCardType: (c.defaultCardType ?? 'app') as 'app' | 'physical',
     });
     setError('');
     setTempPassword(null);
@@ -279,6 +285,8 @@ export default function EmpresasClient({
         phone: form.phone.replace(/\D/g, '') || undefined,
         externalCode: form.externalCode.trim() || undefined,
         memberSince: form.memberSince || undefined,
+        dependentPaymentMode: form.dependentPaymentMode,
+        defaultCardType: form.defaultCardType,
       };
 
       if (editingId) {
@@ -1038,6 +1046,41 @@ export default function EmpresasClient({
                     <strong>Dica:</strong> Se informar um e-mail, o sistema criará automaticamente o login do RH com uma senha temporária.
                   </div>
                 )}
+              </div>
+
+              {/* Section 4: Políticas da Empresa */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 pb-1 border-b border-gray-100">
+                  <div className="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-black">4</div>
+                  <h3 className="text-sm font-bold text-slate-700">Políticas da Empresa</h3>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1">Pagamento de dependentes</label>
+                    <p className="text-xs text-slate-400 mb-1.5">Quem arca com o custo de dependentes vinculados</p>
+                    <select
+                      value={form.dependentPaymentMode}
+                      onChange={(e) => setForm({ ...form, dependentPaymentMode: e.target.value as 'titular' | 'empresa' })}
+                      className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-slate-50"
+                    >
+                      <option value="titular">Titular paga</option>
+                      <option value="empresa">Empresa paga</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1">Cartão padrão</label>
+                    <p className="text-xs text-slate-400 mb-1.5">Aplicado a novos beneficiários por padrão</p>
+                    <select
+                      value={form.defaultCardType}
+                      onChange={(e) => setForm({ ...form, defaultCardType: e.target.value as 'app' | 'physical' })}
+                      className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-slate-50"
+                    >
+                      <option value="app">Somente aplicativo</option>
+                      <option value="physical">Físico + aplicativo</option>
+                    </select>
+                  </div>
+                </div>
               </div>
 
               {error && (

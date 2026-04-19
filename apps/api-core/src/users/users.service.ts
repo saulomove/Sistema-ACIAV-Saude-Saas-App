@@ -1,6 +1,8 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
+
+const INACTIVATION_LOCK_DAYS = 30;
 
 @Injectable()
 export class UsersService {
@@ -62,10 +64,62 @@ export class UsersService {
     kinship?: string;
     billingName?: string;
     memberSince?: string;
+    cardTypeOverride?: string;
+    confirmTransfer?: boolean;
   }) {
     const birthDate = data.birthDate ? new Date(data.birthDate) : undefined;
     const memberSince = data.memberSince ? new Date(data.memberSince) : undefined;
     const cpfClean = data.cpf.replace(/\D/g, '');
+
+    const conflict = await this.findCpfConflict(cpfClean, data.unitId, data.companyId);
+    if (conflict && !data.confirmTransfer) {
+      throw new ConflictException({
+        conflict: true,
+        existingUserId: conflict.id,
+        existingCompany: conflict.company
+          ? { id: conflict.company.id, corporateName: conflict.company.corporateName }
+          : null,
+        inactivationLockUntil: conflict.inactivationLockUntil,
+        message:
+          'Este CPF já está cadastrado em outra empresa da mesma unidade. Use confirmTransfer=true para transferir.',
+      });
+    }
+    if (conflict && data.confirmTransfer) {
+      if (conflict.inactivationLockUntil && conflict.inactivationLockUntil > new Date()) {
+        throw new ConflictException({
+          conflict: true,
+          locked: true,
+          existingUserId: conflict.id,
+          inactivationLockUntil: conflict.inactivationLockUntil,
+          message:
+            'Este beneficiário foi inativado recentemente e está bloqueado para transferência por 30 dias.',
+        });
+      }
+      const transferred = await this.prisma.user.update({
+        where: { id: conflict.id },
+        data: {
+          companyId: data.companyId || undefined,
+          fullName: data.fullName,
+          type: data.type || 'titular',
+          gender: data.gender || undefined,
+          birthDate,
+          phone: data.phone || undefined,
+          kinship: data.kinship || undefined,
+          billingName: data.billingName || undefined,
+          memberSince: memberSince ?? undefined,
+          externalCode: data.externalCode || undefined,
+          cardTypeOverride: data.cardTypeOverride ?? undefined,
+          status: true,
+          inactivationReason: null,
+          inactivatedAt: null,
+        },
+      });
+      await this.prisma.authUser.updateMany({
+        where: { userId: conflict.id },
+        data: { companyId: data.companyId || null },
+      });
+      return { ...transferred, loginCreated: false, transferred: true };
+    }
 
     const user = await this.prisma.user.create({
       data: {
@@ -82,6 +136,7 @@ export class UsersService {
         kinship: data.kinship || undefined,
         billingName: data.billingName || undefined,
         memberSince,
+        cardTypeOverride: data.cardTypeOverride || undefined,
       },
     });
 
@@ -117,11 +172,49 @@ export class UsersService {
     externalCode?: string;
     birthDate?: string;
     memberSince?: string;
+    cardTypeOverride?: string | null;
+    confirmTransfer?: boolean;
   }) {
+    if (data.companyId !== undefined) {
+      const current = await this.prisma.user.findUnique({
+        where: { id },
+        select: { id: true, cpf: true, unitId: true, companyId: true, inactivationLockUntil: true },
+      });
+      if (!current) throw new NotFoundException('Beneficiário não encontrado.');
+
+      const targetCompanyId = data.companyId || null;
+      const changingCompany = (current.companyId ?? null) !== targetCompanyId;
+
+      if (changingCompany) {
+        if (current.inactivationLockUntil && current.inactivationLockUntil > new Date()) {
+          throw new ConflictException({
+            conflict: true,
+            locked: true,
+            inactivationLockUntil: current.inactivationLockUntil,
+            message:
+              'Beneficiário foi inativado recentemente e está bloqueado para transferência por 30 dias.',
+          });
+        }
+        const conflict = await this.findCpfConflict(current.cpf, current.unitId, targetCompanyId ?? undefined, id);
+        if (conflict && !data.confirmTransfer) {
+          throw new ConflictException({
+            conflict: true,
+            existingUserId: conflict.id,
+            existingCompany: conflict.company
+              ? { id: conflict.company.id, corporateName: conflict.company.corporateName }
+              : null,
+            inactivationLockUntil: conflict.inactivationLockUntil,
+            message:
+              'Outro registro com este CPF já existe em outra empresa. Use confirmTransfer=true para consolidar.',
+          });
+        }
+      }
+    }
+
     const updateData: Record<string, unknown> = {};
     if (data.fullName !== undefined) updateData.fullName = data.fullName;
     if (data.status !== undefined) updateData.status = data.status;
-    if (data.companyId !== undefined) updateData.companyId = data.companyId;
+    if (data.companyId !== undefined) updateData.companyId = data.companyId || null;
     if (data.phone !== undefined) updateData.phone = data.phone;
     if (data.gender !== undefined) updateData.gender = data.gender;
     if (data.kinship !== undefined) updateData.kinship = data.kinship;
@@ -129,7 +222,66 @@ export class UsersService {
     if (data.externalCode !== undefined) updateData.externalCode = data.externalCode;
     if (data.birthDate !== undefined) updateData.birthDate = new Date(data.birthDate);
     if (data.memberSince !== undefined) updateData.memberSince = new Date(data.memberSince);
+    if (data.cardTypeOverride !== undefined) updateData.cardTypeOverride = data.cardTypeOverride;
     return this.prisma.user.update({ where: { id }, data: updateData });
+  }
+
+  async findCpfConflict(
+    cpf: string,
+    unitId: string,
+    targetCompanyId?: string,
+    excludeUserId?: string,
+  ) {
+    if (!cpf || !unitId) return null;
+    return this.prisma.user.findFirst({
+      where: {
+        cpf,
+        unitId,
+        ...(excludeUserId ? { NOT: { id: excludeUserId } } : {}),
+        ...(targetCompanyId
+          ? { NOT: [{ companyId: targetCompanyId }, ...(excludeUserId ? [{ id: excludeUserId }] : [])] }
+          : {}),
+      },
+      select: {
+        id: true,
+        fullName: true,
+        cpf: true,
+        status: true,
+        inactivationLockUntil: true,
+        companyId: true,
+        company: { select: { id: true, corporateName: true } },
+      },
+    });
+  }
+
+  async inactivateWithReason(id: string, reason: string) {
+    const trimmed = (reason ?? '').trim();
+    if (trimmed.length < 3) {
+      throw new BadRequestException('Motivo de inativação obrigatório (mínimo 3 caracteres).');
+    }
+    const now = new Date();
+    const lockUntil = new Date(now.getTime() + INACTIVATION_LOCK_DAYS * 24 * 60 * 60 * 1000);
+    return this.prisma.user.update({
+      where: { id },
+      data: {
+        status: false,
+        inactivationReason: trimmed,
+        inactivatedAt: now,
+        inactivationLockUntil: lockUntil,
+      },
+    });
+  }
+
+  async reactivate(id: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+      select: { id: true, inactivationLockUntil: true },
+    });
+    if (!user) throw new NotFoundException('Beneficiário não encontrado.');
+    return this.prisma.user.update({
+      where: { id },
+      data: { status: true, inactivationReason: null, inactivatedAt: null, inactivationLockUntil: null },
+    });
   }
 
   async validateUserByCpf(cpf: string, unitId: string) {
