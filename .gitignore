@@ -6,6 +6,7 @@ dist/
 build/
 *.db
 .DS_Store
+.turbo/
 docs/PRD-DEPLOY-*.md
 
 # PWA generated files (regenerated on build)

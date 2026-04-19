@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import Modal from '../../../components/Modal';
+import ExportExcelButton from '../../../components/ExportExcelButton';
 import { api } from '../../../lib/api-client';
 
 interface Company {
@@ -413,7 +414,8 @@ export default function BeneficiariosClient({
             {isPending && <span className="ml-2 text-primary animate-pulse">atualizando...</span>}
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
+          <ExportExcelButton endpoint="users" />
           <button
             onClick={openImportModal}
             className="bg-white border border-gray-200 hover:bg-gray-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 shadow-sm"

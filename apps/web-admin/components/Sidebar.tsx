@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard, Users, Building, Stethoscope, FileText, Settings,
-  Award, LogOut, Globe, DollarSign, ShieldCheck, BarChart3, Menu, X,
+  Award, LogOut, Globe, DollarSign, ShieldCheck, BarChart3, Menu, X, History,
 } from 'lucide-react';
 import Image from 'next/image';
 import clsx from 'clsx';
@@ -20,6 +20,7 @@ function getMenuItems(role: string): MenuItem[] {
         { name: 'Unidades', icon: Globe, href: '/unidades' },
         { name: 'Usuários Admin', icon: ShieldCheck, href: '/admin-users' },
         { name: 'Faturamento', icon: DollarSign, href: '/faturamento' },
+        { name: 'Auditoria', icon: History, href: '/auditoria' },
         { name: 'Configurações', icon: Settings, href: '/configuracoes' },
       ];
     case 'admin_unit':
@@ -29,7 +30,7 @@ function getMenuItems(role: string): MenuItem[] {
         { name: 'Empresas (RH)', icon: Building, href: '/empresas' },
         { name: 'Credenciados', icon: Stethoscope, href: '/credenciados' },
         { name: 'Relatórios', icon: BarChart3, href: '/relatorios' },
-        { name: 'Gamificação', icon: Award, href: '/premios' },
+        { name: 'Auditoria', icon: History, href: '/auditoria' },
         { name: 'Configurações', icon: Settings, href: '/configuracoes' },
       ];
     default:

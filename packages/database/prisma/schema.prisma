@@ -10,67 +10,80 @@ datasource db {
 }
 
 model Unit {
-  id        String   @id @default(uuid())
-  name      String
-  subdomain String   @unique
-  settings  String?  // JSON string
-  status    Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id               String   @id @default(uuid())
+  name             String
+  subdomain        String   @unique
+  settings         String?  // JSON string
+  supportWhatsapp  String?
+  featuresRewards  Boolean  @default(false)
+  status           Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   companies Company[]
   users     User[]
   providers Provider[]
+  auditLogs AuditLog[]
 }
 
 model Company {
-  id            String    @id @default(uuid())
-  unitId        String
-  externalCode  String?
-  corporateName String
-  tradeName     String?
-  cnpj          String    @unique
-  adminEmail    String?
-  address       String?
-  neighborhood  String?
-  zipCode       String?
-  city          String?
-  state         String?
-  phone         String?
-  memberSince   DateTime?
-  status        Boolean   @default(true)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id                    String    @id @default(uuid())
+  unitId                String
+  externalCode          String?
+  corporateName         String
+  tradeName             String?
+  cnpj                  String    @unique
+  adminEmail            String?
+  address               String?
+  neighborhood          String?
+  zipCode               String?
+  city                  String?
+  state                 String?
+  phone                 String?
+  memberSince           DateTime?
+  dependentPaymentMode  String    @default("titular") // 'titular' | 'empresa'
+  defaultCardType       String    @default("app")     // 'app' | 'physical'
+  status                Boolean   @default(true)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 
   unit  Unit   @relation(fields: [unitId], references: [id], onDelete: Cascade)
   users User[]
 }
 
 model User {
-  id            String    @id @default(uuid())
-  companyId     String?
-  unitId        String
-  externalCode  String?
-  fullName      String
-  cpf           String
-  type          String    // 'titular' or 'dependente'
-  parentId      String?
-  gender        String?
-  birthDate     DateTime?
-  phone         String?
-  kinship       String?
-  billingName   String?
-  memberSince   DateTime?
-  pointsBalance Int       @default(0)
-  status        Boolean   @default(true)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id                    String    @id @default(uuid())
+  companyId             String?
+  unitId                String
+  externalCode          String?
+  fullName              String
+  cpf                   String
+  type                  String    // 'titular' or 'dependente'
+  parentId              String?
+  gender                String?
+  birthDate             DateTime?
+  phone                 String?
+  kinship               String?
+  billingName           String?
+  memberSince           DateTime?
+  email                 String?
+  whatsapp              String?
+  firstAccessDone       Boolean   @default(false)
+  inactivationReason    String?
+  inactivatedAt         DateTime?
+  inactivationLockUntil DateTime?
+  cardTypeOverride      String?   // 'app' | 'physical' — null herda da empresa
+  pointsBalance         Int       @default(0)
+  status                Boolean   @default(true)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 
-  unit         Unit           @relation(fields: [unitId], references: [id], onDelete: Cascade)
-  company      Company?       @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  parent       User?          @relation("UserToDependents", fields: [parentId], references: [id])
-  dependents   User[]         @relation("UserToDependents")
-  transactions Transaction[]
+  unit          Unit                   @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  company       Company?               @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  parent        User?                  @relation("UserToDependents", fields: [parentId], references: [id])
+  dependents    User[]                 @relation("UserToDependents")
+  transactions  Transaction[]
+  contactClicks ProviderContactClick[]
 
   @@unique([cpf, unitId])
 }
@@ -86,6 +99,7 @@ model Provider {
   category         String
   specialty        String?
   address          String?
+  city             String?
   phone            String?
   whatsapp         String?
   email            String?
@@ -96,23 +110,26 @@ model Provider {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
-  unit         Unit          @relation(fields: [unitId], references: [id], onDelete: Cascade)
-  services     Service[]
-  transactions Transaction[]
-  rewards      Reward[]
+  unit          Unit                   @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  services      Service[]
+  transactions  Transaction[]
+  rewards       Reward[]
+  contactClicks ProviderContactClick[]
 }
 
 model Service {
-  id              String   @id @default(uuid())
-  providerId      String
-  description     String
-  originalPrice   Decimal  @default(0.0)
-  insurancePrice  Decimal  @default(0.0)
-  discountedPrice Decimal  @default(0.0)
-  discountType    String   @default("fixed") // "fixed" ou "percentage"
-  discountValue   Decimal  @default(0)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id                 String   @id @default(uuid())
+  providerId         String
+  description        String
+  originalPrice      Decimal  @default(0.0)
+  insurancePrice     Decimal  @default(0.0) // deprecated — mantido para histórico
+  discountedPrice    Decimal  @default(0.0) // calculado: originalPrice * (1 - discountMaxPercent/100)
+  discountType       String   @default("fixed") // "fixed" ou "percentage" (legado)
+  discountValue      Decimal  @default(0)
+  discountMinPercent Int?
+  discountMaxPercent Int?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
   provider     Provider      @relation(fields: [providerId], references: [id], onDelete: Cascade)
   transactions Transaction[]
@@ -147,19 +164,72 @@ model Reward {
 }
 
 model AuthUser {
-  id           String   @id @default(uuid())
-  email        String   @unique
-  passwordHash String
-  role         String   // 'super_admin' | 'admin_unit' | 'rh' | 'provider' | 'patient'
-  unitId       String?
-  companyId    String?
-  providerId   String?
-  userId       String?
-  status       Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id                     String   @id @default(uuid())
+  email                  String   @unique
+  passwordHash           String
+  role                   String   // 'super_admin' | 'admin_unit' | 'rh' | 'provider' | 'patient'
+  unitId                 String?
+  companyId              String?
+  providerId             String?
+  userId                 String?
+  passwordChangeRequired Boolean  @default(false)
+  status                 Boolean  @default(true)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
 
-  sessions Session[]
+  sessions       Session[]
+  passwordResets PasswordResetToken[]
+}
+
+model PasswordResetToken {
+  id         String    @id @default(uuid())
+  authUserId String
+  tokenHash  String    @unique
+  expiresAt  DateTime
+  usedAt     DateTime?
+  createdAt  DateTime  @default(now())
+
+  authUser AuthUser @relation(fields: [authUserId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
+  @@index([authUserId])
+}
+
+model AuditLog {
+  id              String   @id @default(uuid())
+  unitId          String?
+  actorAuthUserId String?
+  actorName       String?
+  actorRole       String?
+  entity          String
+  entityId        String?
+  action          String   // create | update | delete | login | reset_password | import | export | status_change | transfer
+  diffBefore      Json?
+  diffAfter       Json?
+  ip              String?
+  userAgent       String?
+  createdAt       DateTime @default(now())
+
+  unit Unit? @relation(fields: [unitId], references: [id], onDelete: Cascade)
+
+  @@index([unitId, createdAt])
+  @@index([entity, entityId])
+  @@index([actorAuthUserId])
+}
+
+model ProviderContactClick {
+  id         String   @id @default(uuid())
+  providerId String
+  userId     String?
+  channel    String   // whatsapp | phone | maps | details
+  ip         String?
+  userAgent  String?
+  clickedAt  DateTime @default(now())
+
+  provider Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  user     User?    @relation(fields: [userId], references: [id])
+
+  @@index([providerId, clickedAt])
 }
 
 model Session {

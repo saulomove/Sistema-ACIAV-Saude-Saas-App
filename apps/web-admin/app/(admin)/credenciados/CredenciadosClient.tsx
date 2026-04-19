@@ -8,6 +8,7 @@ import {
   CheckCircle2, Building2, Phone, Copy, Key, Camera, ImageIcon,
 } from 'lucide-react';
 import Modal from '../../../components/Modal';
+import ExportExcelButton from '../../../components/ExportExcelButton';
 import { api } from '../../../lib/api-client';
 
 interface Service {
@@ -436,12 +437,15 @@ export default function CredenciadosClient({
             {isPending && <span className="ml-2 text-primary animate-pulse">atualizando...</span>}
           </p>
         </div>
-        <button
-          onClick={openCreate}
-          className="bg-primary hover:bg-primary-dark text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm flex items-center gap-2"
-        >
-          <Plus size={16} /> Novo Credenciado
-        </button>
+        <div className="flex items-center gap-3 flex-wrap">
+          <ExportExcelButton endpoint="providers" />
+          <button
+            onClick={openCreate}
+            className="bg-primary hover:bg-primary-dark text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm flex items-center gap-2"
+          >
+            <Plus size={16} /> Novo Credenciado
+          </button>
+        </div>
       </div>
 
       {/* Table */}

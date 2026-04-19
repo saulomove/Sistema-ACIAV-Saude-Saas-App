@@ -3,12 +3,13 @@
 import { useState, useTransition, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import {
-  Building, Plus, Search, Pencil, Trash2, FileSpreadsheet, Download,
+  Building, Plus, Search, Pencil, Trash2, FileSpreadsheet,
   Users, Loader2, X, MapPin, Phone, Key, Copy, CheckCircle2, AlertCircle,
   ChevronRight, Save, FileText, Upload, Calendar,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import Modal from '../../../components/Modal';
+import ExportExcelButton from '../../../components/ExportExcelButton';
 import { api } from '../../../lib/api-client';
 
 interface Company {
@@ -449,9 +450,7 @@ export default function EmpresasClient({
               className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
             />
           </div>
-          <button className="text-slate-500 hover:text-slate-700 flex items-center gap-1 text-sm font-medium">
-            <Download size={16} /> Exportar
-          </button>
+          <ExportExcelButton endpoint="companies" />
         </div>
 
         {lista.length === 0 ? (
