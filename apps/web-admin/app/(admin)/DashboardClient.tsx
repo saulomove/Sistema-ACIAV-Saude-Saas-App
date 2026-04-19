@@ -1,6 +1,7 @@
 'use client';
 
-import { Activity, Users, Building, TrendingUp, ChevronRight, Calendar, ArrowUpRight } from 'lucide-react';
+import Link from 'next/link';
+import { Activity, Users, Building, TrendingUp, ChevronRight, ArrowUpRight } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
@@ -103,14 +104,6 @@ export default function DashboardClient({
         <div>
           <h1 className="text-3xl font-black text-slate-800 tracking-tight">Dashboard ACIAV</h1>
           <p className="text-slate-500 mt-2 font-medium">Visão estratégica e analítica do seu ecossistema de saúde.</p>
-        </div>
-        <div className="flex items-center gap-4">
-          <div className="relative">
-            <Calendar size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <select className="pl-10 pr-10 py-2.5 bg-white border border-gray-200 text-sm font-semibold rounded-xl text-slate-700 outline-none focus:ring-4 focus:ring-primary/10 shadow-sm appearance-none cursor-pointer transition-all hover:border-primary/50">
-              <option>Últimos 6 Meses</option>
-            </select>
-          </div>
         </div>
       </motion.div>
 
@@ -221,9 +214,12 @@ export default function DashboardClient({
               ))
             )}
           </div>
-          <button className="w-full mt-6 py-4 text-sm font-bold text-secondary hover:text-white hover:bg-secondary border-2 border-secondary rounded-xl transition-all shadow-sm hover:shadow-lg">
+          <Link
+            href="/credenciados"
+            className="w-full mt-6 py-4 text-sm font-bold text-secondary hover:text-white hover:bg-secondary border-2 border-secondary rounded-xl transition-all shadow-sm hover:shadow-lg text-center"
+          >
             Ver Ranking Completo
-          </button>
+          </Link>
         </div>
       </motion.div>
     </motion.div>

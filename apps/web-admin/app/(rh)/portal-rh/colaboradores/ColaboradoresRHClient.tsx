@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { Users, Plus, Search, Loader2 } from 'lucide-react';
+import { Users, Plus, Search, Loader2, X, AlertTriangle } from 'lucide-react';
 import Modal from '../../../../components/Modal';
 import { api } from '../../../../lib/api-client';
 
@@ -15,7 +15,20 @@ interface Colaborador {
   _count?: { dependents: number; transactions: number };
 }
 
+interface ConflictInfo {
+  existingUserId: string;
+  existingCompany: string | null;
+  locked: boolean;
+  lockUntil: string | null;
+  message: string;
+}
+
 const EMPTY_FORM = { fullName: '', cpf: '' };
+
+function formatDatePt(iso: string | null) {
+  if (!iso) return '';
+  try { return new Date(iso).toLocaleDateString('pt-BR'); } catch { return iso; }
+}
 
 export default function ColaboradoresRHClient({
   colaboradores,
@@ -33,6 +46,7 @@ export default function ColaboradoresRHClient({
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [conflictInfo, setConflictInfo] = useState<ConflictInfo | null>(null);
 
   const lista = (colaboradores as Colaborador[]).filter((c) =>
     !search ||
@@ -55,7 +69,7 @@ export default function ColaboradoresRHClient({
       .replace(/(\d{3})(\d{1,2})$/, '$1-$2');
   }
 
-  async function handleSave() {
+  async function handleSave(confirmTransfer = false) {
     const cpfClean = form.cpf.replace(/\D/g, '');
     if (!form.fullName.trim()) { setError('Nome completo é obrigatório.'); return; }
     if (cpfClean.length !== 11) { setError('CPF inválido.'); return; }
@@ -64,14 +78,36 @@ export default function ColaboradoresRHClient({
     setSaving(true);
     setError('');
     try {
-      await api.post('/users', {
-        fullName: form.fullName.trim(),
-        cpf: cpfClean,
-        type: 'titular',
-        companyId,
-        unitId,
+      const qs = confirmTransfer ? '?confirmTransfer=true' : '';
+      const res = await fetch(`/internal/api/users${qs}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fullName: form.fullName.trim(),
+          cpf: cpfClean,
+          type: 'titular',
+          companyId,
+          unitId,
+        }),
       });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const body = (data?.message && typeof data.message === 'object') ? data.message : data;
+        if (res.status === 409 && body?.conflict) {
+          setConflictInfo({
+            existingUserId: body.existingUserId,
+            existingCompany: body.existingCompany?.corporateName || null,
+            locked: !!body.locked,
+            lockUntil: body.inactivationLockUntil || null,
+            message: body.message || 'Conflito de cadastro.',
+          });
+          return;
+        }
+        setError(body?.message || `Erro ${res.status}`);
+        return;
+      }
       setModalOpen(false);
+      setConflictInfo(null);
       startTransition(() => router.refresh());
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Erro ao cadastrar colaborador.');
@@ -213,7 +249,7 @@ export default function ColaboradoresRHClient({
               Cancelar
             </button>
             <button
-              onClick={handleSave}
+              onClick={() => handleSave(false)}
               disabled={saving}
               className="flex-1 bg-secondary text-white py-2.5 rounded-xl font-medium hover:bg-orange-600 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
             >
@@ -223,6 +259,56 @@ export default function ColaboradoresRHClient({
           </div>
         </div>
       </Modal>
+
+      {conflictInfo && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+              <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
+                <AlertTriangle size={18} className={conflictInfo.locked ? 'text-rose-500' : 'text-amber-500'} />
+                {conflictInfo.locked ? 'Transferência bloqueada' : 'CPF já cadastrado em outra empresa'}
+              </h3>
+              <button onClick={() => setConflictInfo(null)} className="text-slate-400 hover:text-slate-600">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="px-6 py-5 space-y-4 text-sm text-slate-600">
+              <p>
+                {conflictInfo.existingCompany
+                  ? <>Este CPF já pertence a <strong>{conflictInfo.existingCompany}</strong>.</>
+                  : <>{conflictInfo.message}</>}
+              </p>
+              {conflictInfo.locked && conflictInfo.lockUntil && (
+                <div className="bg-amber-50 border border-amber-200 text-amber-800 text-sm px-3 py-2 rounded-lg">
+                  Este beneficiário foi inativado recentemente e está bloqueado para nova empresa até{' '}
+                  <strong>{formatDatePt(conflictInfo.lockUntil)}</strong>.
+                </div>
+              )}
+              {!conflictInfo.locked && (
+                <p>Deseja transferir o colaborador para a sua empresa? O histórico de transações é preservado.</p>
+              )}
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  onClick={() => setConflictInfo(null)}
+                  className="px-4 py-2 text-sm font-bold text-slate-600 hover:text-slate-800"
+                >
+                  Cancelar
+                </button>
+                {!conflictInfo.locked && (
+                  <button
+                    onClick={() => { setConflictInfo(null); handleSave(true); }}
+                    disabled={saving}
+                    className="inline-flex items-center gap-2 bg-primary hover:bg-primary-dark disabled:opacity-60 text-white font-bold px-4 py-2 rounded-lg text-sm"
+                  >
+                    {saving && <Loader2 size={14} className="animate-spin" />}
+                    Transferir para esta empresa
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

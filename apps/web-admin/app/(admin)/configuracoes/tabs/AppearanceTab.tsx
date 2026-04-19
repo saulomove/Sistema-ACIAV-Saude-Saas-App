@@ -1,12 +1,13 @@
 'use client';
 
-import { useState } from 'react';
-import { Save, CheckCircle } from 'lucide-react';
+import { useRef, useState } from 'react';
+import { Save, CheckCircle, Upload, Loader2, Trash2 } from 'lucide-react';
 
 interface AppearanceSettings {
   platformName?: string;
   primaryColor?: string;
   secondaryColor?: string;
+  logoUrl?: string;
 }
 
 interface Props {
@@ -21,14 +22,18 @@ export default function AppearanceTab({ unitId, unitName, subdomain, settings, r
   const [platformName, setPlatformName] = useState(settings.platformName ?? unitName ?? 'ACIAV Saúde');
   const [primaryColor, setPrimaryColor] = useState(settings.primaryColor ?? '#00796B');
   const [secondaryColor, setSecondaryColor] = useState(settings.secondaryColor ?? '#E65100');
+  const [logoUrl, setLogoUrl] = useState<string | null>(settings.logoUrl ?? null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   async function handleSave() {
     setSaving(true);
     setSaved(false);
     try {
-      const merged = { ...rawSettings, platformName, primaryColor, secondaryColor };
+      const merged = { ...rawSettings, platformName, primaryColor, secondaryColor, ...(logoUrl ? { logoUrl } : { logoUrl: undefined }) };
       const res = await fetch(`/internal/api/units/${unitId}/settings`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -43,6 +48,56 @@ export default function AppearanceTab({ unitId, unitName, subdomain, settings, r
       setSaving(false);
     }
   }
+
+  async function handleLogoUpload(file: File) {
+    setUploadError(null);
+    if (file.size > 2 * 1024 * 1024) {
+      setUploadError('Arquivo muito grande (máx 2MB).');
+      return;
+    }
+    const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/svg+xml'];
+    if (!allowed.includes(file.type)) {
+      setUploadError('Formato inválido. Use JPG, PNG, WebP ou SVG.');
+      return;
+    }
+    setUploading(true);
+    try {
+      const form = new FormData();
+      form.append('file', file);
+      const res = await fetch(`/internal/api/units/${unitId}/logo`, {
+        method: 'POST',
+        body: form,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error((data as { message?: string }).message || 'Falha no upload.');
+      setLogoUrl((data as { logoUrl: string }).logoUrl);
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : 'Erro no upload.');
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  }
+
+  async function handleRemoveLogo() {
+    if (!confirm('Remover o logotipo atual?')) return;
+    const merged = { ...rawSettings, platformName, primaryColor, secondaryColor };
+    delete (merged as Record<string, unknown>).logoUrl;
+    try {
+      const res = await fetch(`/internal/api/units/${unitId}/settings`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ settings: JSON.stringify(merged) }),
+      });
+      if (!res.ok) throw new Error();
+      setLogoUrl(null);
+    } catch {
+      alert('Erro ao remover logotipo.');
+    }
+  }
+
+  const apiOrigin = typeof window !== 'undefined' ? window.location.origin.replace('://app.', '://api.') : '';
+  const logoDisplayUrl = logoUrl ? (logoUrl.startsWith('http') ? logoUrl : `${apiOrigin}${logoUrl}`) : null;
 
   return (
     <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
@@ -117,12 +172,57 @@ export default function AppearanceTab({ unitId, unitName, subdomain, settings, r
         <div className="border-t border-gray-100 pt-6">
           <h4 className="font-bold text-sm text-slate-800 mb-4">Logotipo</h4>
           <div className="flex items-start gap-4">
-            <div className="w-32 h-32 border-2 border-dashed border-gray-300 rounded-xl flex items-center justify-center bg-slate-50 hover:bg-slate-100 transition-colors cursor-pointer text-slate-400">
-              <span className="text-xs font-bold text-center px-4">Clique para fazer upload (PNG transparente)</span>
-            </div>
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              className="w-32 h-32 border-2 border-dashed border-gray-300 rounded-xl flex items-center justify-center bg-slate-50 hover:bg-slate-100 transition-colors cursor-pointer text-slate-400 overflow-hidden relative disabled:opacity-60"
+            >
+              {uploading ? (
+                <Loader2 className="animate-spin text-slate-400" size={24} />
+              ) : logoDisplayUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={logoDisplayUrl} alt="Logotipo" className="max-w-full max-h-full object-contain" />
+              ) : (
+                <span className="text-xs font-bold text-center px-4 flex flex-col items-center gap-1">
+                  <Upload size={20} />
+                  Clique para enviar
+                </span>
+              )}
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/svg+xml"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) handleLogoUpload(f);
+              }}
+            />
             <div className="flex-1">
-              <p className="text-sm text-slate-600 mb-2">Recomendamos enviar uma imagem PNG sem fundo, com no mínimo 500x500px para garantir qualidade nas carteirinhas digitais e na Web.</p>
-              <button className="text-sm text-primary font-bold hover:underline">Baixar Logo Atual</button>
+              <p className="text-sm text-slate-600 mb-2">
+                Recomendamos PNG/SVG sem fundo, com no mínimo 500×500px. Máx. 2MB.
+              </p>
+              {uploadError && <p className="text-xs text-rose-600 mb-2 font-medium">{uploadError}</p>}
+              <div className="flex items-center gap-4 text-sm">
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="text-primary font-bold hover:underline flex items-center gap-1"
+                >
+                  <Upload size={14} /> Enviar logotipo
+                </button>
+                {logoUrl && (
+                  <button
+                    type="button"
+                    onClick={handleRemoveLogo}
+                    className="text-rose-600 font-bold hover:underline flex items-center gap-1"
+                  >
+                    <Trash2 size={14} /> Remover
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>

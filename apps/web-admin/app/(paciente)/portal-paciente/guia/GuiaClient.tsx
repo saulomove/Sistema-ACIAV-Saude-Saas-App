@@ -1,7 +1,8 @@
 'use client';
 
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { MapPin, Phone, Mail, MessageCircle, Stethoscope, Filter, Percent } from 'lucide-react';
+import { MapPin, Phone, Mail, MessageCircle, Stethoscope, Filter, Percent, ArrowRight } from 'lucide-react';
 
 interface Service {
   id: string;
@@ -264,6 +265,13 @@ export default function GuiaClient({ providers, cities, categories, initialCity,
                       <Mail size={13} /> E-mail
                     </a>
                   )}
+                  <Link
+                    href={`/portal-paciente/guia/${p.id}`}
+                    onClick={() => trackClick(p.id, 'details')}
+                    className="ml-auto inline-flex items-center gap-1 bg-[#007178] text-white hover:bg-[#005f65] text-xs font-bold px-3 py-1.5 rounded-lg"
+                  >
+                    Ver detalhes <ArrowRight size={13} />
+                  </Link>
                 </div>
               </div>
             );

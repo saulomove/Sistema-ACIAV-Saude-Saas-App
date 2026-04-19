@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { Building, Plus, Globe, Settings2, Pencil, Loader2 } from 'lucide-react';
+import { Building, Plus, Globe, Pencil, Loader2 } from 'lucide-react';
 import Modal from '../../../components/Modal';
 import { api } from '../../../lib/api-client';
 
@@ -142,20 +142,16 @@ export default function UnidadesClient({ units, role }: { units: unknown[]; role
               </div>
             </div>
 
-            <div className="flex items-center gap-3 relative z-10 border-t border-gray-100 pt-4">
-              <button className="flex-1 bg-white border border-gray-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2">
-                <Settings2 size={16} /> White Label
-              </button>
-              {isSuperAdmin && (
+            {isSuperAdmin && (
+              <div className="flex items-center gap-3 relative z-10 border-t border-gray-100 pt-4">
                 <button
                   onClick={() => openEdit(unit)}
-                  className="text-slate-400 hover:text-blue-600 p-2 rounded-lg hover:bg-blue-50 transition-colors"
-                  title="Editar"
+                  className="flex-1 bg-white border border-gray-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
                 >
-                  <Pencil size={18} />
+                  <Pencil size={16} /> Editar unidade
                 </button>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         ))}
       </div>

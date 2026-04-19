@@ -834,6 +834,26 @@ export default function BeneficiariosClient({
                 <span className={`inline-flex px-3 py-1.5 text-sm font-bold rounded-full ${drawerUser.status ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
                   {drawerUser.status ? 'Ativo' : 'Inativo'}
                 </span>
+                {!drawerUser.status && (drawerUser.inactivationReason || drawerUser.inactivatedAt || drawerUser.inactivationLockUntil) && (
+                  <div className="mt-3 bg-red-50 border border-red-200 rounded-lg p-3 space-y-1.5">
+                    {drawerUser.inactivationReason && (
+                      <div>
+                        <p className="text-[10px] font-bold text-red-600 uppercase tracking-wide">Motivo</p>
+                        <p className="text-sm text-red-800">{drawerUser.inactivationReason}</p>
+                      </div>
+                    )}
+                    {drawerUser.inactivatedAt && (
+                      <p className="text-xs text-red-700">
+                        Inativado em <strong>{formatDate(drawerUser.inactivatedAt)}</strong>
+                      </p>
+                    )}
+                    {drawerUser.inactivationLockUntil && new Date(drawerUser.inactivationLockUntil) > new Date() && (
+                      <p className="text-xs text-red-700">
+                        Bloqueado para transferência até <strong>{formatDate(drawerUser.inactivationLockUntil)}</strong>
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Actions */}

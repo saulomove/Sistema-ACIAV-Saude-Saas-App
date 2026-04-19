@@ -218,6 +218,47 @@ export class AuthService {
     });
   }
 
+  async updateAdminUser(id: string, data: { email?: string; role?: string; unitId?: string | null }) {
+    const current = await this.prisma.authUser.findUnique({ where: { id } });
+    if (!current) throw new BadRequestException('Usuário não encontrado.');
+
+    const patch: { email?: string; role?: string; unitId?: string | null } = {};
+
+    if (data.email !== undefined) {
+      const email = data.email.trim().toLowerCase();
+      if (!email.includes('@')) throw new BadRequestException('E-mail inválido.');
+      if (email !== current.email) {
+        const dup = await this.prisma.authUser.findUnique({ where: { email } });
+        if (dup) throw new BadRequestException('E-mail já utilizado por outro usuário.');
+        patch.email = email;
+      }
+    }
+
+    if (data.role !== undefined) {
+      if (!['super_admin', 'admin_unit'].includes(data.role)) {
+        throw new BadRequestException('Perfil inválido.');
+      }
+      patch.role = data.role;
+    }
+
+    if (data.unitId !== undefined) {
+      patch.unitId = data.unitId || null;
+    }
+
+    // super_admin não pode ter unitId
+    if ((patch.role ?? current.role) === 'super_admin') {
+      patch.unitId = null;
+    } else if ((patch.role ?? current.role) === 'admin_unit' && !(patch.unitId ?? current.unitId)) {
+      throw new BadRequestException('Admin Unidade requer uma unidade associada.');
+    }
+
+    return this.prisma.authUser.update({
+      where: { id },
+      data: patch,
+      select: { id: true, email: true, role: true, unitId: true, status: true },
+    });
+  }
+
   async changePassword(authUserId: string, currentPassword: string, newPassword: string) {
     const authUser = await this.prisma.authUser.findUnique({ where: { id: authUserId } });
     if (!authUser) throw new UnauthorizedException();

@@ -1,11 +1,23 @@
-import { BadRequestException, Body, Controller, Delete, ForbiddenException, Get, HttpCode, HttpStatus, Param, Patch, Post, Put, Req, Res, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, ForbiddenException, Get, HttpCode, HttpStatus, Param, Patch, Post, Put, Req, Res, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
+import * as path from 'path';
+import * as crypto from 'crypto';
 import type { Request, Response } from 'express';
 import { UnitsService } from './units.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { EmailService } from '../email/email.service';
 import { ExportService } from '../export/export.service';
+
+const unitLogoStorage = diskStorage({
+  destination: path.join(process.cwd(), 'uploads', 'units'),
+  filename: (_req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    cb(null, `${crypto.randomBytes(16).toString('hex')}${ext}`);
+  },
+});
 
 @Controller('units')
 @UseGuards(AuthGuard('jwt'))
@@ -134,6 +146,53 @@ export class UnitsController {
 
     if (!result.ok) throw new BadRequestException(`Falha ao enviar teste: ${result.error ?? 'unknown'}`);
     return { ok: true };
+  }
+
+  @Post(':id/logo')
+  @UseInterceptors(FileInterceptor('file', {
+    storage: unitLogoStorage,
+    limits: { fileSize: 2 * 1024 * 1024 },
+    fileFilter: (_req, file, cb) => {
+      const allowed = ['.jpg', '.jpeg', '.png', '.webp', '.svg'];
+      const ext = path.extname(file.originalname).toLowerCase();
+      if (allowed.includes(ext)) cb(null, true);
+      else cb(new BadRequestException('Formato inválido. Use JPG, PNG, WebP ou SVG.'), false);
+    },
+  }))
+  async uploadLogo(
+    @Req() req: Request & { user?: any },
+    @Param('id') id: string,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    const user = req.user;
+    const isOwner = user?.unitId === id;
+    const isSuperAdmin = user?.role === 'super_admin';
+    if (!isOwner && !isSuperAdmin) throw new ForbiddenException();
+    if (!file) throw new BadRequestException('Nenhum arquivo enviado.');
+
+    const logoUrl = `/uploads/units/${file.filename}`;
+    const current = await this.prisma.unit.findUnique({ where: { id }, select: { settings: true } });
+    let merged: Record<string, unknown> = {};
+    if (current?.settings) {
+      try { merged = JSON.parse(current.settings); } catch { merged = {}; }
+    }
+    merged.logoUrl = logoUrl;
+    await this.unitsService.update(id, { settings: JSON.stringify(merged) });
+
+    this.audit.log({
+      unitId: id,
+      actorAuthUserId: user.sub,
+      actorName: user.email,
+      actorRole: user.role,
+      entity: 'unit',
+      entityId: id,
+      action: 'update',
+      diffAfter: { logoUrl },
+      ip: req.ip,
+      userAgent: req.headers['user-agent'] ?? null,
+    });
+
+    return { logoUrl };
   }
 
   @Get(':id/full-export')

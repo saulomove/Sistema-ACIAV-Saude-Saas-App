@@ -1,41 +1,33 @@
-'use client';
+import { redirect } from 'next/navigation';
+import { Settings, AlertCircle, MessageCircle, Lock } from 'lucide-react';
+import { getSessionUser, serverFetch } from '../../../../lib/server-api';
 
-import { useState } from 'react';
-import { Settings, Eye, EyeOff, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
-import { api } from '../../../../lib/api-client';
+interface Unit {
+  id: string;
+  supportWhatsapp?: string | null;
+}
 
-export default function ConfiguracoesCredPage() {
-  const [currentPassword, setCurrentPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [showCurrent, setShowCurrent] = useState(false);
-  const [showNew, setShowNew] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+function whatsLink(raw: string | null | undefined, message: string): string | null {
+  if (!raw) return null;
+  const digits = raw.replace(/\D/g, '');
+  if (!digits) return null;
+  return `https://wa.me/55${digits}?text=${encodeURIComponent(message)}`;
+}
 
-  async function handleChangePassword() {
-    setError('');
-    setSuccess('');
+export default async function ConfiguracoesCredPage() {
+  const user = await getSessionUser();
+  if (!user || user.role !== 'provider') redirect('/login');
 
-    if (!currentPassword.trim()) { setError('Informe a senha atual.'); return; }
-    if (newPassword.length < 8) { setError('A nova senha deve ter no mínimo 8 caracteres.'); return; }
-    if (!/\d/.test(newPassword)) { setError('A nova senha deve conter ao menos um número.'); return; }
-    if (newPassword !== confirmPassword) { setError('A confirmação da senha não confere.'); return; }
-
-    setSaving(true);
-    try {
-      await api.patch('/auth/change-password', { currentPassword, newPassword });
-      setSuccess('Senha alterada com sucesso!');
-      setCurrentPassword('');
-      setNewPassword('');
-      setConfirmPassword('');
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Erro ao alterar senha.');
-    } finally {
-      setSaving(false);
-    }
+  let supportWhatsapp: string | null = null;
+  if (user.unitId) {
+    const unit = await serverFetch<Unit>(`/units/${user.unitId}`);
+    supportWhatsapp = unit?.supportWhatsapp ?? null;
   }
+
+  const supportHref = whatsLink(
+    supportWhatsapp,
+    'Olá, sou credenciado ACIAV Saúde e gostaria de solicitar uma alteração na minha conta.',
+  );
 
   return (
     <div className="max-w-lg mx-auto space-y-6">
@@ -43,78 +35,47 @@ export default function ConfiguracoesCredPage() {
         <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
           <Settings className="text-[#007178]" /> Configurações
         </h1>
-        <p className="text-slate-500 text-sm mt-1">Gerencie sua conta e preferências.</p>
+        <p className="text-slate-500 text-sm mt-1">Sua conta é gerenciada pela administração da ACIAV.</p>
       </div>
 
       <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 space-y-5">
-        <h2 className="text-lg font-bold text-slate-800">Alterar Senha</h2>
-        <p className="text-sm text-slate-500">
-          Recomendamos trocar a senha temporária no primeiro acesso.
-        </p>
-
-        <div>
-          <label className="block text-sm font-bold text-slate-700 mb-1.5">Senha Atual *</label>
-          <div className="relative">
-            <input
-              type={showCurrent ? 'text' : 'password'}
-              value={currentPassword}
-              onChange={(e) => setCurrentPassword(e.target.value)}
-              className="w-full border border-gray-200 rounded-lg px-4 py-2.5 pr-11 text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#007178]/20 bg-slate-50"
-              placeholder="Digite sua senha atual"
-            />
-            <button type="button" onClick={() => setShowCurrent(!showCurrent)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700">
-              {showCurrent ? <EyeOff size={17} /> : <Eye size={17} />}
-            </button>
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-5 flex items-start gap-3">
+          <AlertCircle size={20} className="text-amber-600 shrink-0 mt-0.5" />
+          <div>
+            <p className="font-bold text-amber-800">Portal somente para consulta</p>
+            <p className="text-sm text-amber-700 mt-1">
+              Por segurança, a alteração de senha, cadastro de serviços e dados do credenciado são feitos
+              diretamente pela administração da ACIAV Saúde. Entre em contato pelo WhatsApp para solicitar
+              qualquer mudança na sua conta.
+            </p>
+            {supportHref ? (
+              <a
+                href={supportHref}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-4 inline-flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white font-bold px-4 py-2.5 rounded-xl text-sm transition-colors"
+              >
+                <MessageCircle size={16} /> Falar com a ACIAV
+              </a>
+            ) : (
+              <p className="mt-3 text-xs text-amber-600">
+                Administração entrará em contato através do canal habitual.
+              </p>
+            )}
           </div>
         </div>
 
-        <div>
-          <label className="block text-sm font-bold text-slate-700 mb-1.5">Nova Senha *</label>
-          <div className="relative">
-            <input
-              type={showNew ? 'text' : 'password'}
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              className="w-full border border-gray-200 rounded-lg px-4 py-2.5 pr-11 text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#007178]/20 bg-slate-50"
-              placeholder="Mínimo 8 caracteres com 1 número"
-            />
-            <button type="button" onClick={() => setShowNew(!showNew)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700">
-              {showNew ? <EyeOff size={17} /> : <Eye size={17} />}
-            </button>
-          </div>
+        <div className="pt-2 border-t border-gray-100">
+          <h2 className="text-sm font-bold text-slate-700 flex items-center gap-2">
+            <Lock size={14} className="text-slate-400" /> O que posso solicitar?
+          </h2>
+          <ul className="mt-3 space-y-2 text-sm text-slate-600">
+            <li className="flex items-start gap-2"><span className="text-[#007178] font-bold">•</span> Alteração de senha de acesso</li>
+            <li className="flex items-start gap-2"><span className="text-[#007178] font-bold">•</span> Atualização de dados cadastrais (foto, clínica, contato)</li>
+            <li className="flex items-start gap-2"><span className="text-[#007178] font-bold">•</span> Inclusão, edição ou remoção de serviços da tabela</li>
+            <li className="flex items-start gap-2"><span className="text-[#007178] font-bold">•</span> Alteração de horários de atendimento</li>
+          </ul>
         </div>
-
-        <div>
-          <label className="block text-sm font-bold text-slate-700 mb-1.5">Confirmar Nova Senha *</label>
-          <input
-            type="password"
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#007178]/20 bg-slate-50"
-            placeholder="Repita a nova senha"
-          />
-        </div>
-
-        {error && (
-          <div className="flex items-center gap-2 text-sm text-red-600 bg-red-50 border border-red-200 px-4 py-2.5 rounded-lg">
-            <AlertCircle size={16} /> {error}
-          </div>
-        )}
-
-        {success && (
-          <div className="flex items-center gap-2 text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 px-4 py-2.5 rounded-lg">
-            <CheckCircle2 size={16} /> {success}
-          </div>
-        )}
-
-        <button
-          onClick={handleChangePassword}
-          disabled={saving}
-          className="w-full bg-[#007178] hover:bg-[#005f64] text-white py-2.5 rounded-xl font-bold transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-        >
-          {saving && <Loader2 size={16} className="animate-spin" />}
-          {saving ? 'Alterando...' : 'Alterar Senha'}
-        </button>
       </div>
     </div>
   );

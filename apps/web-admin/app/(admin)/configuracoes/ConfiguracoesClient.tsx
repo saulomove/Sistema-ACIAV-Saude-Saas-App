@@ -44,6 +44,7 @@ export default function ConfiguracoesClient({ unitId, unitName, subdomain, curre
     platformName: rawSettings.platformName as string | undefined,
     primaryColor: rawSettings.primaryColor as string | undefined,
     secondaryColor: rawSettings.secondaryColor as string | undefined,
+    logoUrl: rawSettings.logoUrl as string | undefined,
   };
   const security = (rawSettings.security as SecuritySettings | undefined) ?? {};
   const integrations = (rawSettings.integrations as Record<string, unknown> | undefined) ?? {};

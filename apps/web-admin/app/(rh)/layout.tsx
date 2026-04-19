@@ -1,7 +1,6 @@
 import { redirect } from 'next/navigation';
 import { getSessionUser, serverFetch } from '../../lib/server-api';
 import SidebarRH from '../../components/SidebarRH';
-import { Bell } from 'lucide-react';
 import Image from 'next/image';
 
 interface Company { id: string; corporateName: string; }
@@ -21,11 +20,6 @@ function HeaderRH({ email, companyName }: { email: string; companyName: string }
         <p className="text-sm font-bold text-slate-700">{companyName}</p>
       </div>
       <div className="flex items-center gap-4">
-        <button className="relative p-2 text-gray-400 hover:text-secondary hover:bg-orange-50 rounded-full transition-all">
-          <Bell size={20} />
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-secondary rounded-full border-2 border-white"></span>
-        </button>
-        <div className="h-8 w-px bg-gray-200 mx-2"></div>
         <div className="flex items-center gap-3">
           <div className="text-right">
             <p className="text-sm font-medium text-gray-700">{email}</p>

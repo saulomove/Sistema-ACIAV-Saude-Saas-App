@@ -127,6 +127,23 @@ export class AuthController {
     return this.authService.toggleAdminUserStatus(id, body.status);
   }
 
+  @Patch('admin-users/:id')
+  @UseGuards(AuthGuard('jwt'))
+  updateAdmin(
+    @Req() req: any,
+    @Param('id') id: string,
+    @Body() body: { email?: string; role?: string; unitId?: string | null },
+  ) {
+    if (req.user?.role !== 'super_admin') {
+      throw new ForbiddenException('Acesso restrito ao Super Admin.');
+    }
+    return this.authService.updateAdminUser(id, {
+      email: body.email,
+      role: body.role,
+      unitId: body.unitId ?? undefined,
+    });
+  }
+
   @Post('forgot-password')
   @HttpCode(HttpStatus.OK)
   @Throttle({ default: { ttl: 60000, limit: 3 } })

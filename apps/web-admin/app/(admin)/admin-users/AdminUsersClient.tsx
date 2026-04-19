@@ -47,6 +47,7 @@ export default function AdminUsersClient({ adminUsers, units }: { adminUsers: un
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('todos');
   const [modalOpen, setModalOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [showPass, setShowPass] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -68,17 +69,30 @@ export default function AdminUsersClient({ adminUsers, units }: { adminUsers: un
 
   function openCreate() {
     setForm(EMPTY_FORM);
+    setEditingId(null);
+    setError('');
+    setShowPass(false);
+    setModalOpen(true);
+  }
+
+  function openEdit(u: AdminUser) {
+    setForm({ email: u.email, password: '', role: u.role, unitId: u.unitId ?? '' });
+    setEditingId(u.id);
     setError('');
     setShowPass(false);
     setModalOpen(true);
   }
 
   async function handleSave() {
-    if (!form.email.trim() || !form.password.trim()) {
-      setError('E-mail e senha são obrigatórios.');
+    if (!form.email.trim()) {
+      setError('E-mail é obrigatório.');
       return;
     }
-    if (form.password.length < 8) {
+    if (!editingId && !form.password.trim()) {
+      setError('Senha é obrigatória para novos usuários.');
+      return;
+    }
+    if (form.password && form.password.length < 8) {
       setError('Senha deve ter no mínimo 8 caracteres.');
       return;
     }
@@ -89,16 +103,25 @@ export default function AdminUsersClient({ adminUsers, units }: { adminUsers: un
     setSaving(true);
     setError('');
     try {
-      await api.post('/auth/admin-users', {
-        email: form.email,
-        password: form.password,
-        role: form.role,
-        unitId: form.unitId || undefined,
-      });
+      if (editingId) {
+        await api.patch(`/auth/admin-users/${editingId}`, {
+          email: form.email,
+          role: form.role,
+          unitId: form.role === 'super_admin' ? null : (form.unitId || null),
+        });
+      } else {
+        await api.post('/auth/admin-users', {
+          email: form.email,
+          password: form.password,
+          role: form.role,
+          unitId: form.unitId || undefined,
+        });
+      }
       setModalOpen(false);
+      setEditingId(null);
       startTransition(() => router.refresh());
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Erro ao criar usuário.');
+      setError(e instanceof Error ? e.message : 'Erro ao salvar usuário.');
     } finally {
       setSaving(false);
     }
@@ -202,7 +225,11 @@ export default function AdminUsersClient({ adminUsers, units }: { adminUsers: un
                       </button>
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <button className="text-slate-400 hover:text-blue-600 p-2 rounded-lg hover:bg-blue-50 transition-colors" title="Editar">
+                      <button
+                        onClick={() => openEdit(u)}
+                        className="text-slate-400 hover:text-blue-600 p-2 rounded-lg hover:bg-blue-50 transition-colors"
+                        title="Editar"
+                      >
                         <Pencil size={16} />
                       </button>
                     </td>
@@ -215,7 +242,7 @@ export default function AdminUsersClient({ adminUsers, units }: { adminUsers: un
       </div>
 
       {/* Modal */}
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Novo Usuário Administrador">
+      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editingId ? 'Editar Administrador' : 'Novo Usuário Administrador'}>
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-bold text-slate-700 mb-1.5">E-mail *</label>
@@ -228,21 +255,29 @@ export default function AdminUsersClient({ adminUsers, units }: { adminUsers: un
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-bold text-slate-700 mb-1.5">Senha *</label>
-            <div className="relative">
-              <input
-                type={showPass ? 'text' : 'password'}
-                value={form.password}
-                onChange={(e) => setForm({ ...form, password: e.target.value })}
-                className="w-full border border-gray-200 rounded-lg px-4 py-2.5 pr-11 text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-slate-50"
-                placeholder="Mínimo 8 caracteres"
-              />
-              <button type="button" onClick={() => setShowPass(!showPass)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700">
-                {showPass ? <EyeOff size={17} /> : <Eye size={17} />}
-              </button>
+          {!editingId && (
+            <div>
+              <label className="block text-sm font-bold text-slate-700 mb-1.5">Senha *</label>
+              <div className="relative">
+                <input
+                  type={showPass ? 'text' : 'password'}
+                  value={form.password}
+                  onChange={(e) => setForm({ ...form, password: e.target.value })}
+                  className="w-full border border-gray-200 rounded-lg px-4 py-2.5 pr-11 text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-slate-50"
+                  placeholder="Mínimo 8 caracteres"
+                />
+                <button type="button" onClick={() => setShowPass(!showPass)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700">
+                  {showPass ? <EyeOff size={17} /> : <Eye size={17} />}
+                </button>
+              </div>
             </div>
-          </div>
+          )}
+
+          {editingId && (
+            <p className="text-xs text-slate-500 bg-slate-50 border border-slate-100 px-4 py-2.5 rounded-lg">
+              Para alterar a senha, use o botão &quot;Resetar senha&quot; na listagem.
+            </p>
+          )}
 
           <div>
             <label className="block text-sm font-bold text-slate-700 mb-2">Perfil *</label>
@@ -299,7 +334,7 @@ export default function AdminUsersClient({ adminUsers, units }: { adminUsers: un
               className="flex-1 bg-secondary text-white py-2.5 rounded-xl font-medium hover:bg-orange-600 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {saving && <Loader2 size={16} className="animate-spin" />}
-              {saving ? 'Criando...' : 'Criar Usuário'}
+              {saving ? 'Salvando...' : editingId ? 'Salvar alterações' : 'Criar Usuário'}
             </button>
           </div>
         </div>

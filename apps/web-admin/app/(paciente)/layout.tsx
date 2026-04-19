@@ -2,7 +2,6 @@ import { redirect } from 'next/navigation';
 import { headers } from 'next/headers';
 import { getSessionUser, serverFetch } from '../../lib/server-api';
 import SidebarPaciente from '../../components/SidebarPaciente';
-import { Bell } from 'lucide-react';
 import Image from 'next/image';
 
 interface PatientCard {
@@ -28,10 +27,6 @@ function HeaderPaciente({ name, company }: { name: string; company: string }) {
         {company && <p className="text-sm font-bold text-slate-600">{company}</p>}
       </div>
       <div className="flex items-center gap-4">
-        <button className="relative p-2 text-gray-400 hover:text-[#007178] hover:bg-teal-50 rounded-full transition-all">
-          <Bell size={20} />
-        </button>
-        <div className="h-8 w-px bg-gray-200 mx-2" />
         <div className="flex items-center gap-3">
           <div className="text-right">
             <p className="text-sm font-medium text-gray-700">{name}</p>
