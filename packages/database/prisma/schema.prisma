@@ -44,6 +44,8 @@ model Company {
   dependentPaymentMode  String    @default("titular") // 'titular' | 'empresa'
   defaultCardType       String    @default("app")     // 'app' | 'physical'
   status                Boolean   @default(true)
+  inactivationReason    String?
+  inactivatedAt         DateTime?
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
 

@@ -12,6 +12,11 @@ interface Service {
   discountValue: number;
 }
 
+interface Unit {
+  id: string;
+  supportWhatsapp?: string | null;
+}
+
 export default async function ServicosPage() {
   const user = await getSessionUser();
   if (!user || user.role !== 'provider') redirect('/login');
@@ -19,5 +24,17 @@ export default async function ServicosPage() {
   const providerId = user.providerId ?? '';
   const services = await serverFetch<Service[]>(`/providers/${providerId}/services`) ?? [];
 
-  return <ServicosClient providerId={providerId} initialServices={services} />;
+  let supportWhatsapp: string | null = null;
+  if (user.unitId) {
+    const unit = await serverFetch<Unit>(`/units/${user.unitId}`);
+    supportWhatsapp = unit?.supportWhatsapp ?? null;
+  }
+
+  return (
+    <ServicosClient
+      providerId={providerId}
+      initialServices={services}
+      supportWhatsapp={supportWhatsapp}
+    />
+  );
 }

@@ -36,6 +36,7 @@ interface User {
   inactivationReason?: string | null;
   inactivatedAt?: string | null;
   inactivationLockUntil?: string | null;
+  createdAt?: string | null;
   pointsBalance: number;
   status: boolean;
   company?: { corporateName: string } | null;
@@ -1268,43 +1269,59 @@ export default function BeneficiariosClient({
                 <X size={18} />
               </button>
             </div>
-            <div className="px-6 py-5 space-y-4">
-              <p className="text-sm text-slate-600">
-                Você está inativando <strong>{inactivateTarget.fullName}</strong>. O beneficiário ficará bloqueado
-                para novas transferências por <strong>30 dias</strong>.
-              </p>
-              <div>
-                <label className="block text-xs font-bold text-slate-600 mb-1.5">Motivo *</label>
-                <textarea
-                  value={inactivateReason}
-                  onChange={(e) => setInactivateReason(e.target.value)}
-                  required
-                  rows={3}
-                  className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-300 focus:border-red-400"
-                  placeholder="Ex.: desligamento em 01/04/2026"
-                />
-              </div>
-              {inactivateError && (
-                <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-3 py-2 rounded-lg">{inactivateError}</div>
-              )}
-              <div className="flex justify-end gap-3 pt-2">
-                <button
-                  onClick={() => { setInactivateTarget(null); setInactivateReason(''); setInactivateError(''); }}
-                  disabled={inactivateSubmitting}
-                  className="px-4 py-2 text-sm font-bold text-slate-600 hover:text-slate-800 disabled:opacity-50"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={handleInactivateSubmit}
-                  disabled={inactivateSubmitting || inactivateReason.trim().length < 3}
-                  className="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 disabled:opacity-60 text-white font-bold px-4 py-2 rounded-lg text-sm"
-                >
-                  {inactivateSubmitting && <Loader2 size={14} className="animate-spin" />}
-                  Confirmar inativação
-                </button>
-              </div>
-            </div>
+            {(() => {
+              const createdAt = inactivateTarget.createdAt ? new Date(inactivateTarget.createdAt) : null;
+              const minDate = createdAt ? new Date(createdAt.getTime() + 30 * 24 * 60 * 60 * 1000) : null;
+              const now = new Date();
+              const locked = !!(minDate && now < minDate);
+              const daysLeft = minDate ? Math.ceil((minDate.getTime() - now.getTime()) / (24 * 60 * 60 * 1000)) : 0;
+              return (
+                <div className="px-6 py-5 space-y-4">
+                  <p className="text-sm text-slate-600">
+                    Você está inativando <strong>{inactivateTarget.fullName}</strong>. O beneficiário ficará bloqueado
+                    para novas transferências por <strong>30 dias</strong>.
+                  </p>
+                  {locked && minDate && (
+                    <div className="bg-amber-50 border border-amber-200 text-amber-800 text-sm px-3 py-2.5 rounded-lg">
+                      <strong>Inativação bloqueada.</strong> Este beneficiário foi cadastrado há menos de 30 dias.
+                      Aguarde mais <strong>{daysLeft} dia(s)</strong> para inativar (liberado em {minDate.toLocaleDateString('pt-BR')}).
+                    </div>
+                  )}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-600 mb-1.5">Motivo *</label>
+                    <textarea
+                      value={inactivateReason}
+                      onChange={(e) => setInactivateReason(e.target.value)}
+                      required
+                      rows={3}
+                      disabled={locked}
+                      className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-300 focus:border-red-400 disabled:bg-slate-50 disabled:text-slate-400"
+                      placeholder="Ex.: desligamento em 01/04/2026"
+                    />
+                  </div>
+                  {inactivateError && (
+                    <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-3 py-2 rounded-lg">{inactivateError}</div>
+                  )}
+                  <div className="flex justify-end gap-3 pt-2">
+                    <button
+                      onClick={() => { setInactivateTarget(null); setInactivateReason(''); setInactivateError(''); }}
+                      disabled={inactivateSubmitting}
+                      className="px-4 py-2 text-sm font-bold text-slate-600 hover:text-slate-800 disabled:opacity-50"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      onClick={handleInactivateSubmit}
+                      disabled={inactivateSubmitting || inactivateReason.trim().length < 3 || locked}
+                      className="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 disabled:opacity-60 text-white font-bold px-4 py-2 rounded-lg text-sm"
+                    >
+                      {inactivateSubmitting && <Loader2 size={14} className="animate-spin" />}
+                      Confirmar inativação
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         </div>
       )}

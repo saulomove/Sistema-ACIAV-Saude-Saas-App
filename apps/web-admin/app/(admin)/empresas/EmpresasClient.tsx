@@ -30,6 +30,8 @@ interface Company {
   status: boolean;
   dependentPaymentMode?: 'titular' | 'empresa' | null;
   defaultCardType?: 'app' | 'physical' | null;
+  inactivationReason?: string | null;
+  inactivatedAt?: string | null;
   _count?: { users: number };
 }
 
@@ -183,10 +185,15 @@ export default function EmpresasClient({
   // Copied feedback
   const [copied, setCopied] = useState(false);
 
-  // Confirmações (CONFIRMAR)
-  const [deleteTarget, setDeleteTarget] = useState<Company | null>(null);
+  // Confirmações (CONFIRMAR) — reset de senha
   const [resetTarget, setResetTarget] = useState<Company | null>(null);
   const [confirmBusy, setConfirmBusy] = useState(false);
+
+  // Inativação com motivo
+  const [inactivateTarget, setInactivateTarget] = useState<Company | null>(null);
+  const [inactivateReason, setInactivateReason] = useState('');
+  const [inactivateError, setInactivateError] = useState('');
+  const [inactivateSubmitting, setInactivateSubmitting] = useState(false);
 
   const lista = (companies as Company[]).filter(
     (c) =>
@@ -339,20 +346,36 @@ export default function EmpresasClient({
 
   function handleDelete(c: Company, e: React.MouseEvent) {
     e.stopPropagation();
-    setDeleteTarget(c);
+    setInactivateTarget(c);
+    setInactivateReason('');
+    setInactivateError('');
   }
 
-  async function confirmDelete() {
-    if (!deleteTarget) return;
-    setConfirmBusy(true);
+  async function handleInactivateSubmit() {
+    if (!inactivateTarget) return;
+    if (inactivateReason.trim().length < 3) {
+      setInactivateError('Informe o motivo da inativação (mínimo 3 caracteres).');
+      return;
+    }
+    setInactivateSubmitting(true);
+    setInactivateError('');
     try {
-      await api.delete(`/companies/${deleteTarget.id}`);
-      setDeleteTarget(null);
+      await api.patch(`/companies/${inactivateTarget.id}/inactivate`, { reason: inactivateReason.trim() });
+      setInactivateTarget(null);
+      setInactivateReason('');
+      if (drawerCompany && drawerCompany.id === inactivateTarget.id) {
+        setDrawerCompany({
+          ...drawerCompany,
+          status: false,
+          inactivationReason: inactivateReason.trim(),
+          inactivatedAt: new Date().toISOString(),
+        } as Company);
+      }
       startTransition(() => router.refresh());
-    } catch {
-      alert('Erro ao inativar empresa.');
+    } catch (e: unknown) {
+      setInactivateError(e instanceof Error ? e.message : 'Erro ao inativar empresa.');
     } finally {
-      setConfirmBusy(false);
+      setInactivateSubmitting(false);
     }
   }
 
@@ -703,6 +726,21 @@ export default function EmpresasClient({
                 <span className={`inline-flex px-3 py-1.5 text-sm font-bold rounded-full ${drawerCompany.status ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
                   {drawerCompany.status ? 'Ativo' : 'Inativo'}
                 </span>
+                {!drawerCompany.status && (drawerCompany.inactivationReason || drawerCompany.inactivatedAt) && (
+                  <div className="mt-3 bg-red-50 border border-red-200 rounded-lg p-3 space-y-1.5">
+                    {drawerCompany.inactivationReason && (
+                      <div>
+                        <p className="text-[10px] font-bold text-red-600 uppercase tracking-wide">Motivo</p>
+                        <p className="text-sm text-red-800">{drawerCompany.inactivationReason}</p>
+                      </div>
+                    )}
+                    {drawerCompany.inactivatedAt && (
+                      <p className="text-xs text-red-700">
+                        Inativada em <strong>{new Date(drawerCompany.inactivatedAt).toLocaleDateString('pt-BR')}</strong>
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Actions */}
@@ -1131,16 +1169,58 @@ export default function EmpresasClient({
         </div>
       </Modal>
 
-      <ConfirmDeleteDialog
-        open={!!deleteTarget}
-        title="Inativar empresa"
-        description="Ao inativar a empresa, seus dados e beneficiários serão preservados, mas ela não aparecerá em listas ativas. Digite CONFIRMAR para prosseguir."
-        targetLabel={deleteTarget?.corporateName}
-        confirmButtonLabel="Inativar"
-        busy={confirmBusy}
-        onConfirm={confirmDelete}
-        onClose={() => !confirmBusy && setDeleteTarget(null)}
-      />
+      {inactivateTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+              <h3 className="text-base font-bold text-slate-800">Inativar empresa</h3>
+              <button
+                onClick={() => { setInactivateTarget(null); setInactivateReason(''); setInactivateError(''); }}
+                className="text-slate-400 hover:text-slate-600"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="px-6 py-5 space-y-4">
+              <p className="text-sm text-slate-600">
+                Você está inativando <strong>{inactivateTarget.corporateName}</strong>. Os beneficiários e o
+                histórico serão preservados, mas a empresa deixará de aparecer nas listas ativas.
+              </p>
+              <div>
+                <label className="block text-xs font-bold text-slate-600 mb-1.5">Motivo *</label>
+                <textarea
+                  value={inactivateReason}
+                  onChange={(e) => setInactivateReason(e.target.value)}
+                  required
+                  rows={3}
+                  className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-300 focus:border-red-400"
+                  placeholder="Ex.: encerramento de contrato em 01/04/2026"
+                />
+              </div>
+              {inactivateError && (
+                <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-3 py-2 rounded-lg">{inactivateError}</div>
+              )}
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  onClick={() => { setInactivateTarget(null); setInactivateReason(''); setInactivateError(''); }}
+                  disabled={inactivateSubmitting}
+                  className="px-4 py-2 text-sm font-bold text-slate-600 hover:text-slate-800 disabled:opacity-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleInactivateSubmit}
+                  disabled={inactivateSubmitting || inactivateReason.trim().length < 3}
+                  className="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 disabled:opacity-60 text-white font-bold px-4 py-2 rounded-lg text-sm"
+                >
+                  {inactivateSubmitting && <Loader2 size={14} className="animate-spin" />}
+                  Confirmar inativação
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <ConfirmDeleteDialog
         open={!!resetTarget}

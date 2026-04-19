@@ -260,6 +260,20 @@ export class UsersService {
       throw new BadRequestException('Motivo de inativação obrigatório (mínimo 3 caracteres).');
     }
     const now = new Date();
+    const target = await this.prisma.user.findUnique({
+      where: { id },
+      select: { id: true, createdAt: true, status: true },
+    });
+    if (!target) throw new NotFoundException('Beneficiário não encontrado.');
+
+    const minInactivationDate = new Date(target.createdAt.getTime() + INACTIVATION_LOCK_DAYS * 24 * 60 * 60 * 1000);
+    if (now < minInactivationDate) {
+      const daysLeft = Math.ceil((minInactivationDate.getTime() - now.getTime()) / (24 * 60 * 60 * 1000));
+      throw new BadRequestException(
+        `Beneficiário cadastrado há menos de ${INACTIVATION_LOCK_DAYS} dias. Aguarde mais ${daysLeft} dia(s) para inativar (liberado em ${minInactivationDate.toLocaleDateString('pt-BR')}).`,
+      );
+    }
+
     const lockUntil = new Date(now.getTime() + INACTIVATION_LOCK_DAYS * 24 * 60 * 60 * 1000);
     return this.prisma.user.update({
       where: { id },

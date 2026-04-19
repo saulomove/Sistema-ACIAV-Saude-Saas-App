@@ -123,7 +123,13 @@ export class CompaniesService {
     if (data.phone !== undefined) updateData.phone = data.phone;
     if (data.externalCode !== undefined) updateData.externalCode = data.externalCode;
     if (data.memberSince !== undefined) updateData.memberSince = new Date(data.memberSince);
-    if (data.status !== undefined) updateData.status = data.status;
+    if (data.status !== undefined) {
+      updateData.status = data.status;
+      if (data.status === true) {
+        updateData.inactivationReason = null;
+        updateData.inactivatedAt = null;
+      }
+    }
     if (data.dependentPaymentMode !== undefined) {
       const v = (data.dependentPaymentMode || 'titular').toLowerCase();
       updateData.dependentPaymentMode = ['titular', 'empresa'].includes(v) ? v : 'titular';
@@ -134,6 +140,21 @@ export class CompaniesService {
     }
 
     return this.prisma.company.update({ where: { id }, data: updateData });
+  }
+
+  async inactivate(id: string, reason: string) {
+    const clean = (reason || '').trim();
+    if (clean.length < 3) {
+      throw new Error('Motivo da inativação é obrigatório (mínimo 3 caracteres).');
+    }
+    return this.prisma.company.update({
+      where: { id },
+      data: {
+        status: false,
+        inactivationReason: clean,
+        inactivatedAt: new Date(),
+      },
+    });
   }
 
   async remove(id: string) {

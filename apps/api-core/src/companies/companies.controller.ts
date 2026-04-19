@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Patch, Param, Body, Query, UseGuards, Req, ForbiddenException } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Patch, Param, Body, Query, UseGuards, Req, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { Throttle } from '@nestjs/throttler';
 import { CompaniesService } from './companies.service';
@@ -97,6 +97,19 @@ export class CompaniesController {
       if (company && company.unitId !== req.user.unitId) throw new ForbiddenException('Acesso negado.');
     }
     return this.companiesService.update(id, { status: body.status });
+  }
+
+  @Patch(':id/inactivate')
+  async inactivate(@Req() req: any, @Param('id') id: string, @Body() body: { reason?: string }) {
+    if (req.user.role !== 'super_admin') {
+      const company = await this.companiesService.findOne(id);
+      if (company && company.unitId !== req.user.unitId) throw new ForbiddenException('Acesso negado.');
+    }
+    try {
+      return await this.companiesService.inactivate(id, body?.reason ?? '');
+    } catch (err: any) {
+      throw new BadRequestException(err?.message || 'Erro ao inativar empresa.');
+    }
   }
 
   @Delete(':id')
