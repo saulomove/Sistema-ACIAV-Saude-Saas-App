@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException, BadRequestException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, BadRequestException, HttpException, HttpStatus } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
@@ -6,6 +6,28 @@ import { PrismaService } from '../prisma/prisma.service';
 import { EmailService } from '../email/email.service';
 
 const RESET_TOKEN_TTL_MIN = 15;
+
+interface SecurityPolicy {
+  passwordMinLength: number;
+  passwordRequireUppercase: boolean;
+  passwordRequireNumber: boolean;
+  passwordRequireSymbol: boolean;
+  sessionTimeoutMinutes: number;
+  maxLoginAttempts: number;
+  lockoutMinutes: number;
+  passwordResetExpirationMinutes: number;
+}
+
+const DEFAULT_POLICY: SecurityPolicy = {
+  passwordMinLength: 8,
+  passwordRequireUppercase: false,
+  passwordRequireNumber: true,
+  passwordRequireSymbol: false,
+  sessionTimeoutMinutes: 480,
+  maxLoginAttempts: 5,
+  lockoutMinutes: 15,
+  passwordResetExpirationMinutes: 15,
+};
 
 @Injectable()
 export class AuthService {
@@ -15,17 +37,64 @@ export class AuthService {
     private emailService: EmailService,
   ) {}
 
+  private async getPolicy(unitId?: string | null): Promise<SecurityPolicy> {
+    if (!unitId) return DEFAULT_POLICY;
+    const unit = await this.prisma.unit.findUnique({ where: { id: unitId }, select: { settings: true } });
+    try {
+      const parsed = unit?.settings ? JSON.parse(unit.settings) : {};
+      return { ...DEFAULT_POLICY, ...(parsed.security ?? {}) };
+    } catch {
+      return DEFAULT_POLICY;
+    }
+  }
+
+  private validatePasswordPolicy(password: string, policy: SecurityPolicy) {
+    if (password.length < policy.passwordMinLength) {
+      throw new BadRequestException(`A senha deve ter no mínimo ${policy.passwordMinLength} caracteres.`);
+    }
+    if (policy.passwordRequireUppercase && !/[A-Z]/.test(password)) {
+      throw new BadRequestException('A senha deve conter ao menos uma letra maiúscula.');
+    }
+    if (policy.passwordRequireNumber && !/\d/.test(password)) {
+      throw new BadRequestException('A senha deve conter ao menos um número.');
+    }
+    if (policy.passwordRequireSymbol && !/[!@#$%^&*(),.?":{}|<>_\-+=~`\[\]\\\/';]/.test(password)) {
+      throw new BadRequestException('A senha deve conter ao menos um caractere especial.');
+    }
+  }
+
   async login(email: string, password: string) {
-    const authUser = await this.prisma.authUser.findUnique({ where: { email } });
+    const normalizedEmail = (email || '').trim().toLowerCase();
+    const authUser = await this.prisma.authUser.findUnique({ where: { email: normalizedEmail } });
 
     if (!authUser || !authUser.status) {
+      this.prisma.loginAttempt.create({ data: { email: normalizedEmail, success: false } }).catch(() => undefined);
       throw new UnauthorizedException('E-mail ou senha incorretos.');
+    }
+
+    const policy = await this.getPolicy(authUser.unitId);
+
+    if (policy.maxLoginAttempts > 0) {
+      const since = new Date(Date.now() - policy.lockoutMinutes * 60 * 1000);
+      const recentFailures = await this.prisma.loginAttempt.count({
+        where: {
+          authUserId: authUser.id,
+          success: false,
+          createdAt: { gte: since },
+        },
+      });
+      if (recentFailures >= policy.maxLoginAttempts) {
+        throw new HttpException('Conta bloqueada temporariamente por excesso de tentativas. Tente novamente mais tarde.', HttpStatus.TOO_MANY_REQUESTS);
+      }
     }
 
     const passwordMatch = await bcrypt.compare(password, authUser.passwordHash);
     if (!passwordMatch) {
+      this.prisma.loginAttempt.create({ data: { authUserId: authUser.id, email: normalizedEmail, success: false } }).catch(() => undefined);
       throw new UnauthorizedException('E-mail ou senha incorretos.');
     }
+
+    this.prisma.loginAttempt.create({ data: { authUserId: authUser.id, email: normalizedEmail, success: true } }).catch(() => undefined);
 
     const payload = {
       sub: authUser.id,
@@ -48,6 +117,11 @@ export class AuthService {
         expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
       },
     });
+
+    await this.prisma.authUser.update({
+      where: { id: authUser.id },
+      data: { lastLoginAt: new Date() },
+    }).catch(() => undefined);
 
     return {
       token,
@@ -124,9 +198,8 @@ export class AuthService {
     companyId?: string;
     providerId?: string;
   }) {
-    if (data.password.length < 8 || !/\d/.test(data.password)) {
-      throw new BadRequestException('A senha deve ter no mínimo 8 caracteres e conter ao menos um número.');
-    }
+    const policy = await this.getPolicy(data.unitId);
+    this.validatePasswordPolicy(data.password, policy);
     const existing = await this.prisma.authUser.findUnique({ where: { email: data.email } });
     if (existing) throw new Error('E-mail já cadastrado no sistema.');
 
@@ -152,12 +225,11 @@ export class AuthService {
     const match = await bcrypt.compare(currentPassword, authUser.passwordHash);
     if (!match) throw new BadRequestException('Senha atual incorreta.');
 
-    if (newPassword.length < 8 || !/\d/.test(newPassword)) {
-      throw new BadRequestException('A nova senha deve ter no mínimo 8 caracteres e conter ao menos um número.');
-    }
+    const policy = await this.getPolicy(authUser.unitId);
+    this.validatePasswordPolicy(newPassword, policy);
 
     const passwordHash = await bcrypt.hash(newPassword, 10);
-    await this.prisma.authUser.update({ where: { id: authUserId }, data: { passwordHash } });
+    await this.prisma.authUser.update({ where: { id: authUserId }, data: { passwordHash, passwordChangeRequired: false } });
     return { message: 'Senha alterada com sucesso.' };
   }
 
@@ -288,16 +360,19 @@ export class AuthService {
 
   async resetPasswordWithToken(rawToken: string, newPassword: string) {
     if (!rawToken) throw new BadRequestException('Token inválido.');
-    if (newPassword.length < 8 || !/\d/.test(newPassword)) {
-      throw new BadRequestException('A nova senha deve ter no mínimo 8 caracteres e conter ao menos um número.');
-    }
 
     const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
-    const record = await this.prisma.passwordResetToken.findUnique({ where: { tokenHash } });
+    const record = await this.prisma.passwordResetToken.findUnique({
+      where: { tokenHash },
+      include: { authUser: { select: { unitId: true } } },
+    });
 
     if (!record || record.usedAt || record.expiresAt < new Date()) {
       throw new BadRequestException('Token inválido ou expirado. Solicite um novo link.');
     }
+
+    const policy = await this.getPolicy(record.authUser.unitId);
+    this.validatePasswordPolicy(newPassword, policy);
 
     const passwordHash = await bcrypt.hash(newPassword, 10);
 

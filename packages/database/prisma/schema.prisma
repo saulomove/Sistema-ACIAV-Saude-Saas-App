@@ -172,6 +172,8 @@ model AuthUser {
   companyId              String?
   providerId             String?
   userId                 String?
+  displayName            String?
+  lastLoginAt            DateTime?
   passwordChangeRequired Boolean  @default(false)
   status                 Boolean  @default(true)
   createdAt              DateTime @default(now())
@@ -241,4 +243,63 @@ model Session {
   createdAt    DateTime @default(now())
 
   authUser AuthUser @relation(fields: [authUserId], references: [id], onDelete: Cascade)
+}
+
+model LoginAttempt {
+  id         String   @id @default(uuid())
+  authUserId String?
+  email      String?
+  ip         String?
+  userAgent  String?
+  success    Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  @@index([authUserId, createdAt])
+  @@index([email, createdAt])
+}
+
+model Backup {
+  id                  String   @id @default(uuid())
+  unitId              String?
+  fileName            String
+  sizeBytes           Int      @default(0)
+  storageUrl          String?
+  createdByAuthUserId String?
+  createdByName       String?
+  status              String   @default("completed") // pending | completed | failed
+  errorMessage        String?
+  createdAt           DateTime @default(now())
+
+  @@index([unitId, createdAt])
+}
+
+model Webhook {
+  id        String   @id @default(uuid())
+  unitId    String
+  url       String
+  events    String   // CSV: "user.created,transaction.created"
+  secret    String
+  status    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  deliveries WebhookDelivery[]
+
+  @@index([unitId])
+}
+
+model WebhookDelivery {
+  id           String   @id @default(uuid())
+  webhookId    String
+  event        String
+  payload      Json
+  responseCode Int?
+  responseBody String?
+  attempt      Int      @default(1)
+  success      Boolean  @default(false)
+  deliveredAt  DateTime @default(now())
+
+  webhook Webhook @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+
+  @@index([webhookId, deliveredAt])
 }

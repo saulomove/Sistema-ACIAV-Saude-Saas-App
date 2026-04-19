@@ -1,153 +1,103 @@
 'use client';
 
-import { useState } from 'react';
-import { Settings, Save, Lock, UserCog, Database, PaintBucket, CheckCircle } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Settings, Lock, UserCog, Database, PaintBucket } from 'lucide-react';
+import AppearanceTab from './tabs/AppearanceTab';
+import AccessTab from './tabs/AccessTab';
+import SecurityTab, { SecuritySettings } from './tabs/SecurityTab';
+import BackupTab, { EmailIntegration } from './tabs/BackupTab';
+
+type TabKey = 'appearance' | 'access' | 'security' | 'backup';
 
 interface ConfiguracoesClientProps {
   unitId: string;
   unitName: string;
   subdomain: string;
-  settings: { platformName?: string; primaryColor?: string; secondaryColor?: string };
+  currentAuthUserId: string;
+  rawSettings: Record<string, unknown>;
 }
 
-export default function ConfiguracoesClient({ unitId, unitName, subdomain, settings }: ConfiguracoesClientProps) {
-  const [platformName, setPlatformName] = useState(settings.platformName ?? unitName ?? 'ACIAV Saúde');
-  const [primaryColor, setPrimaryColor] = useState(settings.primaryColor ?? '#00796B');
-  const [secondaryColor, setSecondaryColor] = useState(settings.secondaryColor ?? '#E65100');
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
+const TABS: Array<{ key: TabKey; label: string; icon: typeof Settings }> = [
+  { key: 'appearance', label: 'Aparência (White Label)', icon: PaintBucket },
+  { key: 'access', label: 'Permissões de Acesso', icon: UserCog },
+  { key: 'security', label: 'Segurança / Autenticação', icon: Lock },
+  { key: 'backup', label: 'Backup & Integrações', icon: Database },
+];
 
-  async function handleSave() {
-    setSaving(true);
-    setSaved(false);
-    try {
-      const body = JSON.stringify({ platformName, primaryColor, secondaryColor });
-      const res = await fetch(`/internal/api/units/${unitId}/settings`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ settings: body }),
-      });
-      if (!res.ok) throw new Error();
-      setSaved(true);
-      setTimeout(() => setSaved(false), 3000);
-    } catch {
-      alert('Erro ao salvar configurações.');
-    } finally {
-      setSaving(false);
-    }
+export default function ConfiguracoesClient({ unitId, unitName, subdomain, currentAuthUserId, rawSettings }: ConfiguracoesClientProps) {
+  const [activeTab, setActiveTab] = useState<TabKey>('appearance');
+
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const t = url.searchParams.get('tab') as TabKey | null;
+    if (t && TABS.some((x) => x.key === t)) setActiveTab(t);
+  }, []);
+
+  function handleTabChange(key: TabKey) {
+    setActiveTab(key);
+    const url = new URL(window.location.href);
+    url.searchParams.set('tab', key);
+    window.history.replaceState(null, '', url.toString());
   }
 
+  const appearance = {
+    platformName: rawSettings.platformName as string | undefined,
+    primaryColor: rawSettings.primaryColor as string | undefined,
+    secondaryColor: rawSettings.secondaryColor as string | undefined,
+  };
+  const security = (rawSettings.security as SecuritySettings | undefined) ?? {};
+  const integrations = (rawSettings.integrations as Record<string, unknown> | undefined) ?? {};
+  const email = (integrations.email as EmailIntegration | undefined) ?? {};
+
   return (
-    <div className="space-y-6 max-w-4xl mx-auto">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-            <Settings className="text-primary" />
-            Configurações do Sistema
-          </h1>
-          <p className="text-slate-500 text-sm mt-1">Ajuste os parâmetros visuais, de acesso e de integrações do sistema ACIAV Saúde.</p>
-        </div>
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className="bg-primary hover:bg-primary-dark text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm flex items-center gap-2 disabled:opacity-60"
-        >
-          {saved ? <><CheckCircle size={16} /> Salvo!</> : <><Save size={16} /> {saving ? 'Salvando...' : 'Salvar Alterações'}</>}
-        </button>
+    <div className="space-y-6 max-w-5xl mx-auto">
+      <div>
+        <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+          <Settings className="text-primary" />
+          Configurações do Sistema
+        </h1>
+        <p className="text-slate-500 text-sm mt-1">Ajuste os parâmetros visuais, de acesso e de integrações do sistema ACIAV Saúde.</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        {/* Menu Lateral */}
         <div className="md:col-span-1 space-y-2">
-          <button className="w-full flex items-center gap-3 px-4 py-3 bg-white text-primary border border-primary/20 rounded-xl font-bold text-sm shadow-sm">
-            <PaintBucket size={18} /> Aparência (White Label)
-          </button>
-          <button className="w-full flex items-center gap-3 px-4 py-3 text-slate-600 hover:bg-white hover:text-primary rounded-xl font-medium text-sm transition-colors">
-            <UserCog size={18} /> Permissões de Acesso
-          </button>
-          <button className="w-full flex items-center gap-3 px-4 py-3 text-slate-600 hover:bg-white hover:text-primary rounded-xl font-medium text-sm transition-colors">
-            <Lock size={18} /> Segurança / Autenticação
-          </button>
-          <button className="w-full flex items-center gap-3 px-4 py-3 text-slate-600 hover:bg-white hover:text-primary rounded-xl font-medium text-sm transition-colors">
-            <Database size={18} /> Backup & Integrações
-          </button>
+          {TABS.map(({ key, label, icon: Icon }) => {
+            const active = activeTab === key;
+            return (
+              <button
+                key={key}
+                onClick={() => handleTabChange(key)}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm transition-colors ${
+                  active
+                    ? 'bg-white text-primary border border-primary/20 font-bold shadow-sm'
+                    : 'text-slate-600 hover:bg-white hover:text-primary font-medium'
+                }`}
+              >
+                <Icon size={18} /> {label}
+              </button>
+            );
+          })}
         </div>
 
-        {/* Formulário Principal */}
-        <div className="md:col-span-3 bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-          <h3 className="font-bold text-lg text-slate-800 mb-6">Identidade Visual da Unidade</h3>
-
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-bold text-slate-700 mb-2">Nome da Plataforma (Título)</label>
-                <input
-                  type="text"
-                  value={platformName}
-                  onChange={(e) => setPlatformName(e.target.value)}
-                  className="w-full bg-slate-50 border border-gray-200 rounded-lg px-4 py-2.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-bold text-slate-700 mb-2">Subdomínio Personalizado</label>
-                <div className="flex items-center">
-                  <span className="bg-slate-100 border border-r-0 border-gray-200 text-slate-500 px-4 py-2.5 rounded-l-lg text-sm">https://</span>
-                  <input
-                    type="text"
-                    defaultValue={subdomain}
-                    readOnly
-                    className="w-full bg-slate-50 border border-t-gray-200 border-b-gray-200 border-l-gray-200 border-r-0 px-4 py-2.5 text-slate-400 text-sm font-mono cursor-not-allowed"
-                  />
-                  <span className="bg-slate-100 border border-l-0 border-gray-200 text-slate-500 px-4 py-2.5 rounded-r-lg text-sm">.aciavsaude.com.br</span>
-                </div>
-                <p className="text-xs text-slate-400 mt-1">Alteração de subdomínio requer suporte.</p>
-              </div>
-            </div>
-
-            <div className="border-t border-gray-100 pt-6">
-              <h4 className="font-bold text-sm text-slate-800 mb-4">Paleta de Cores Principais</h4>
-              <div className="flex items-center gap-8">
-                <div>
-                  <label className="block text-xs font-medium text-slate-500 mb-2">Cor Primária (Teal/Marca)</label>
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="color"
-                      value={primaryColor}
-                      onChange={(e) => setPrimaryColor(e.target.value)}
-                      className="w-10 h-10 rounded cursor-pointer border-none p-0 outline-none"
-                    />
-                    <span className="font-mono text-sm uppercase text-slate-700">{primaryColor}</span>
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-500 mb-2">Cor Secundária (Laranja/Ações)</label>
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="color"
-                      value={secondaryColor}
-                      onChange={(e) => setSecondaryColor(e.target.value)}
-                      className="w-10 h-10 rounded cursor-pointer border-none p-0 outline-none"
-                    />
-                    <span className="font-mono text-sm uppercase text-slate-700">{secondaryColor}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="border-t border-gray-100 pt-6">
-              <h4 className="font-bold text-sm text-slate-800 mb-4">Logotipo</h4>
-              <div className="flex items-start gap-4">
-                <div className="w-32 h-32 border-2 border-dashed border-gray-300 rounded-xl flex items-center justify-center bg-slate-50 hover:bg-slate-100 transition-colors cursor-pointer text-slate-400">
-                  <span className="text-xs font-bold text-center px-4">Clique para fazer upload (PNG transparente)</span>
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm text-slate-600 mb-2">Recomendamos enviar uma imagem PNG sem fundo, com no mínimo 500x500px para garantir qualidade nas carteirinhas digitais e na Web.</p>
-                  <button className="text-sm text-primary font-bold hover:underline">Baixar Logo Atual</button>
-                </div>
-              </div>
-            </div>
-          </div>
+        <div className="md:col-span-3">
+          {activeTab === 'appearance' && (
+            <AppearanceTab
+              unitId={unitId}
+              unitName={unitName}
+              subdomain={subdomain}
+              settings={appearance}
+              rawSettings={rawSettings}
+            />
+          )}
+          {activeTab === 'access' && (
+            <AccessTab unitId={unitId} currentAuthUserId={currentAuthUserId} />
+          )}
+          {activeTab === 'security' && (
+            <SecurityTab unitId={unitId} initial={security} rawSettings={rawSettings} />
+          )}
+          {activeTab === 'backup' && (
+            <BackupTab unitId={unitId} emailInitial={email} rawSettings={rawSettings} />
+          )}
         </div>
       </div>
     </div>

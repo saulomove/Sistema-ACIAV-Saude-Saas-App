@@ -18,6 +18,9 @@ import { ExportModule } from './export/export.module';
 import { EmailModule } from './email/email.module';
 import { PortalPacienteModule } from './portal-paciente/portal-paciente.module';
 import { PortalRhModule } from './portal-rh/portal-rh.module';
+import { AuthUsersModule } from './auth-users/auth-users.module';
+import { BackupModule } from './backup/backup.module';
+import { WebhooksModule } from './webhooks/webhooks.module';
 import { ReadOnlyProviderGuard } from './common/guards/read-only-role.guard';
 
 @Module({
@@ -37,6 +40,9 @@ import { ReadOnlyProviderGuard } from './common/guards/read-only-role.guard';
     ExportModule,
     PortalPacienteModule,
     PortalRhModule,
+    AuthUsersModule,
+    BackupModule,
+    WebhooksModule,
   ],
   controllers: [AppController],
   providers: [

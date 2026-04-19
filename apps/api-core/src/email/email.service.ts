@@ -1,21 +1,54 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
 
 interface EmailPayload {
   to: string;
   subject: string;
   html: string;
   text?: string;
+  unitId?: string | null;
+}
+
+interface ResolvedConfig {
+  apiKey: string;
+  from: string;
 }
 
 @Injectable()
 export class EmailService {
   private readonly logger = new Logger('EmailService');
-  private readonly apiKey = process.env.RESEND_API_KEY ?? '';
-  private readonly from = process.env.RESEND_FROM ?? 'ACIAV Saúde <no-reply@aciavsaude.com.br>';
+  private readonly fallbackApiKey = process.env.RESEND_API_KEY ?? '';
+  private readonly fallbackFrom = process.env.RESEND_FROM ?? 'ACIAV Saúde <no-reply@aciavsaude.com.br>';
+
+  constructor(private readonly prisma: PrismaService) {}
+
+  private buildFrom(email?: string, name?: string): string | null {
+    if (!email) return null;
+    const safeName = (name ?? 'ACIAV Saúde').replace(/[<>]/g, '');
+    return `${safeName} <${email}>`;
+  }
+
+  private async resolveConfig(unitId?: string | null): Promise<ResolvedConfig> {
+    const fallback: ResolvedConfig = { apiKey: this.fallbackApiKey, from: this.fallbackFrom };
+    if (!unitId) return fallback;
+    try {
+      const unit = await this.prisma.unit.findUnique({ where: { id: unitId }, select: { settings: true } });
+      if (!unit?.settings) return fallback;
+      const parsed = JSON.parse(unit.settings) as Record<string, any>;
+      const email = parsed?.integrations?.email as Record<string, any> | undefined;
+      if (!email) return fallback;
+      const apiKey = typeof email.resendApiKey === 'string' && email.resendApiKey ? email.resendApiKey : this.fallbackApiKey;
+      const from = this.buildFrom(email.fromEmail, email.fromName) ?? this.fallbackFrom;
+      return { apiKey, from };
+    } catch {
+      return fallback;
+    }
+  }
 
   async send(payload: EmailPayload): Promise<{ ok: boolean; id?: string; error?: string }> {
-    if (!this.apiKey) {
-      this.logger.warn(`RESEND_API_KEY ausente — email para ${payload.to} não enviado. Assunto: ${payload.subject}`);
+    const config = await this.resolveConfig(payload.unitId);
+    if (!config.apiKey) {
+      this.logger.warn(`Resend API key ausente — email para ${payload.to} não enviado. Assunto: ${payload.subject}`);
       return { ok: false, error: 'RESEND_API_KEY_NOT_CONFIGURED' };
     }
 
@@ -23,11 +56,11 @@ export class EmailService {
       const res = await fetch('https://api.resend.com/emails', {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${this.apiKey}`,
+          Authorization: `Bearer ${config.apiKey}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          from: this.from,
+          from: config.from,
           to: [payload.to],
           subject: payload.subject,
           html: payload.html,

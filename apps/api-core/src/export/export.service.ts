@@ -165,6 +165,79 @@ export class ExportService {
     return XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' }) as Buffer;
   }
 
+  async exportFullUnit(unitId: string): Promise<Buffer> {
+    const [users, companies, providers, transactions, auditLogs] = await Promise.all([
+      this.prisma.user.findMany({ where: { unitId }, include: { company: true, parent: true }, orderBy: { fullName: 'asc' } }),
+      this.prisma.company.findMany({ where: { unitId }, orderBy: { corporateName: 'asc' } }),
+      this.prisma.provider.findMany({ where: { unitId }, orderBy: { name: 'asc' } }),
+      this.prisma.transaction.findMany({ where: { user: { unitId } }, include: { user: true, provider: true, service: true }, orderBy: { createdAt: 'desc' } }),
+      this.prisma.auditLog.findMany({ where: { unitId }, orderBy: { createdAt: 'desc' }, take: 5000 }),
+    ]);
+
+    const userRows = users.map((u) => ({
+      ID: u.id,
+      Nome: u.fullName,
+      CPF: u.cpf,
+      Tipo: u.type,
+      Email: u.email ?? '',
+      WhatsApp: u.whatsapp ?? '',
+      Empresa: u.company?.corporateName ?? '',
+      Titular: u.parent?.fullName ?? '',
+      Ativo: u.status ? 'Sim' : 'Não',
+      CriadoEm: this.formatDate(u.createdAt),
+    }));
+    const companyRows = companies.map((c) => ({
+      ID: c.id,
+      RazaoSocial: c.corporateName,
+      NomeFantasia: c.tradeName ?? '',
+      CNPJ: c.cnpj,
+      EmailAdmin: c.adminEmail ?? '',
+      Cidade: c.city ?? '',
+      Ativa: c.status ? 'Sim' : 'Não',
+      CriadoEm: this.formatDate(c.createdAt),
+    }));
+    const providerRows = providers.map((p) => ({
+      ID: p.id,
+      Nome: p.name,
+      Categoria: p.category,
+      CPFCNPJ: p.cpfCnpj ?? '',
+      Cidade: p.city ?? '',
+      Telefone: p.phone ?? '',
+      Email: p.email ?? '',
+      Ativo: p.status ? 'Sim' : 'Não',
+      CriadoEm: this.formatDate(p.createdAt),
+    }));
+    const transactionRows = transactions.map((t) => ({
+      Data: this.formatDate(t.createdAt),
+      PacienteID: t.user.id,
+      Paciente: t.user.fullName,
+      CredenciadoID: t.provider.id,
+      Credenciado: t.provider.name,
+      Servico: t.service.description,
+      ValorOriginal: Number(t.service.originalPrice),
+      ValorEconomizado: Number(t.amountSaved),
+      ConfirmadoPaciente: t.confirmedByUser ? 'Sim' : 'Não',
+      Avaliacao: t.rating ?? '',
+    }));
+    const auditRows = auditLogs.map((a) => ({
+      Data: this.formatDate(a.createdAt),
+      Ator: a.actorName ?? '',
+      AtorRole: a.actorRole ?? '',
+      Entidade: a.entity,
+      EntidadeID: a.entityId ?? '',
+      Acao: a.action,
+      IP: a.ip ?? '',
+    }));
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(userRows), 'Beneficiarios');
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(companyRows), 'Empresas');
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(providerRows), 'Credenciados');
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(transactionRows), 'Atendimentos');
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(auditRows), 'Auditoria');
+    return XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' }) as Buffer;
+  }
+
   private formatDate(d: Date): string {
     return d.toISOString().slice(0, 10);
   }

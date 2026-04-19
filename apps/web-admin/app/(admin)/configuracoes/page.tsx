@@ -15,7 +15,7 @@ export default async function ConfiguracoesPage() {
 
   const unit = await serverFetch<Unit>(`/units/${user.unitId}`);
 
-  let parsedSettings: { platformName?: string; primaryColor?: string; secondaryColor?: string } = {};
+  let parsedSettings: Record<string, unknown> = {};
   try {
     if (unit?.settings) parsedSettings = JSON.parse(unit.settings);
   } catch {
@@ -27,7 +27,8 @@ export default async function ConfiguracoesPage() {
       unitId={unit?.id ?? user.unitId ?? ''}
       unitName={unit?.name ?? ''}
       subdomain={unit?.subdomain ?? ''}
-      settings={parsedSettings}
+      currentAuthUserId={user.sub}
+      rawSettings={parsedSettings}
     />
   );
 }
