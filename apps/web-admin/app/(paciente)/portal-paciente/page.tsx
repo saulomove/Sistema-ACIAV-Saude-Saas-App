@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation';
 import { getSessionUser, serverFetch } from '../../../lib/server-api';
 import Link from 'next/link';
 import Image from 'next/image';
-import { ArrowRight, MapPin, HeartPulse, ShieldAlert, Star } from 'lucide-react';
+import { ArrowRight, MapPin, HeartPulse, ShieldAlert, Star, Sparkles } from 'lucide-react';
 import QrCodeImage from '../../../components/QrCodeImage';
 
 interface PatientCard {
@@ -15,9 +15,10 @@ interface PatientCard {
   _count: { transactions: number };
 }
 
-interface Transaction {
-  id: string;
-  amountSaved: number;
+interface PatientSummary {
+  totalSaved: number;
+  totalTransactions: number;
+  lastVisit: string | null;
 }
 
 function maskCPF(cpf: string) {
@@ -32,13 +33,13 @@ export default async function PortalPacientePage() {
   const user = await getSessionUser();
   if (!user || user.role !== 'patient') redirect('/login');
 
-  const userId = user.userId ?? '';
-  const [card, transactions] = await Promise.all([
+  const [card, summary] = await Promise.all([
     serverFetch<PatientCard>(`/users/me/card`),
-    serverFetch<Transaction[]>(`/users/${userId}/transactions`),
+    serverFetch<PatientSummary>(`/portal-paciente/summary`),
   ]);
 
-  const totalEconomia = (transactions ?? []).reduce((sum, t) => sum + Number(t.amountSaved), 0);
+  const totalEconomia = Number(summary?.totalSaved ?? 0);
+  const totalVisitas = summary?.totalTransactions ?? 0;
   const firstName = card?.fullName?.split(' ')[0] ?? 'Paciente';
   const cpfFormatted = card?.cpf ? maskCPF(card.cpf) : '---';
   const companyName = card?.company?.corporateName ?? '';
@@ -49,6 +50,26 @@ export default async function PortalPacientePage() {
       <div>
         <h1 className="text-3xl font-black text-slate-800 tracking-tight">Olá, {firstName}!</h1>
         <p className="text-slate-500 mt-2 font-medium">Sua carteirinha digital e histórico de benefícios num só lugar.</p>
+      </div>
+
+      {/* KPI — Economia Acumulada */}
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#007178] to-[#005f65] p-6 md:p-8 text-white shadow-[0_20px_60px_-15px_rgba(0,113,120,0.4)]">
+        <div className="absolute top-0 right-0 w-48 h-48 bg-white/5 rounded-full -mr-16 -mt-16" />
+        <div className="absolute bottom-0 left-0 w-32 h-32 bg-white/5 rounded-full -ml-8 -mb-8" />
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div className="flex items-start gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-white/15 flex items-center justify-center shrink-0">
+              <Sparkles size={22} />
+            </div>
+            <div>
+              <p className="text-xs uppercase tracking-widest font-bold text-white/70">Sua economia com a ACIAV Saúde</p>
+              <p className="text-3xl md:text-4xl font-black tracking-tight mt-1">{fmtMoney(totalEconomia)}</p>
+              <p className="text-sm text-white/70 mt-1">
+                em {totalVisitas} atendimento{totalVisitas === 1 ? '' : 's'} na rede credenciada.
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Carteirinha Digital */}

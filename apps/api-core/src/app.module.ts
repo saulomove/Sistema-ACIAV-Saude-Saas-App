@@ -15,12 +15,15 @@ import { RewardsModule } from './rewards/rewards.module';
 import { AuditModule } from './audit/audit.module';
 import { AuditInterceptor } from './audit/audit.interceptor';
 import { ExportModule } from './export/export.module';
+import { EmailModule } from './email/email.module';
+import { PortalPacienteModule } from './portal-paciente/portal-paciente.module';
 
 @Module({
   imports: [
     ThrottlerModule.forRoot([{ ttl: 60000, limit: 10 }]),
     PrismaModule,
     AuditModule,
+    EmailModule,
     AuthModule,
     UsersModule,
     UnitsModule,
@@ -30,6 +33,7 @@ import { ExportModule } from './export/export.module';
     TransactionsModule,
     RewardsModule,
     ExportModule,
+    PortalPacienteModule,
   ],
   controllers: [AppController],
   providers: [

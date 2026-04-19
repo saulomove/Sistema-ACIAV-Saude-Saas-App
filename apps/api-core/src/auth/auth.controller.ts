@@ -15,6 +15,7 @@ import {
 import { AuthGuard } from '@nestjs/passport';
 import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
+import type { Request } from 'express';
 
 @Controller('auth')
 export class AuthController {
@@ -124,5 +125,27 @@ export class AuthController {
       throw new ForbiddenException('Acesso restrito ao Super Admin.');
     }
     return this.authService.toggleAdminUserStatus(id, body.status);
+  }
+
+  @Post('forgot-password')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { ttl: 60000, limit: 3 } })
+  forgotPassword(@Req() req: Request, @Body() body: { identifier?: string; email?: string }) {
+    const identifier = body.identifier || body.email || '';
+    const origin = (req.headers.origin as string | undefined) ?? null;
+    return this.authService.forgotPassword(identifier, origin);
+  }
+
+  @Get('reset-password/validate')
+  @Throttle({ default: { ttl: 60000, limit: 30 } })
+  validateResetToken(@Query('token') token: string) {
+    return this.authService.validateResetToken(token);
+  }
+
+  @Post('reset-password/confirm')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { ttl: 60000, limit: 5 } })
+  resetPasswordConfirm(@Body() body: { token: string; newPassword: string }) {
+    return this.authService.resetPasswordWithToken(body.token, body.newPassword);
   }
 }

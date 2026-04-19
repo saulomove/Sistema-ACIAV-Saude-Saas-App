@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import Image from 'next/image';
-import { Eye, EyeOff, Loader2 } from 'lucide-react';
+import { CheckCircle2, Eye, EyeOff, Loader2 } from 'lucide-react';
 
 const ROLE_REDIRECT: Record<string, string> = {
   super_admin: '/dashboard',
@@ -15,11 +16,19 @@ const ROLE_REDIRECT: Record<string, string> = {
 
 export default function LoginPage() {
   const router = useRouter();
+  const [firstAccessOk, setFirstAccessOk] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPass, setShowPass] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const sp = new URLSearchParams(window.location.search);
+      setFirstAccessOk(sp.get('firstAccess') === 'ok');
+    }
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -118,6 +127,13 @@ export default function LoginPage() {
             <p className="text-slate-500 text-sm mt-1">Entre com suas credenciais para acessar o sistema.</p>
           </div>
 
+          {firstAccessOk && (
+            <div className="mb-5 bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm px-4 py-3 rounded-xl flex items-center gap-2">
+              <CheckCircle2 size={16} />
+              Cadastro concluído! Faça login com seu e-mail e a nova senha.
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-5">
             {/* Email */}
             <div>
@@ -168,6 +184,12 @@ export default function LoginPage() {
               {loading && <Loader2 size={16} className="animate-spin" />}
               {loading ? 'Entrando...' : 'Entrar no Sistema'}
             </button>
+
+            <div className="text-center">
+              <Link href="/esqueci-senha" className="text-xs text-[#007178] hover:underline font-medium">
+                Esqueci minha senha
+              </Link>
+            </div>
           </form>
 
           <p className="text-center text-xs text-slate-400 mt-8">

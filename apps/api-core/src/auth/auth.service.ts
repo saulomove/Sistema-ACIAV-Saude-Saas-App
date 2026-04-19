@@ -3,12 +3,16 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
+import { EmailService } from '../email/email.service';
+
+const RESET_TOKEN_TTL_MIN = 15;
 
 @Injectable()
 export class AuthService {
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
+    private emailService: EmailService,
   ) {}
 
   async login(email: string, password: string) {
@@ -206,5 +210,117 @@ export class AuthService {
       providerId: authUser.providerId,
       userId: authUser.userId,
     };
+  }
+
+  async forgotPassword(rawIdentifier: string, origin: string | null) {
+    const identifier = (rawIdentifier ?? '').trim().toLowerCase();
+    const genericOk = { message: 'Se existir uma conta com esses dados, enviaremos um link para redefinir a senha.' };
+
+    if (!identifier) return genericOk;
+
+    const isEmail = identifier.includes('@');
+    let authUser = null as Awaited<ReturnType<typeof this.prisma.authUser.findFirst>> | null;
+
+    if (isEmail) {
+      authUser = await this.prisma.authUser.findUnique({ where: { email: identifier } });
+      if (!authUser) {
+        const user = await this.prisma.user.findFirst({ where: { email: identifier }, select: { id: true } });
+        if (user) authUser = await this.prisma.authUser.findFirst({ where: { userId: user.id } });
+      }
+    } else {
+      const cpf = identifier.replace(/\D/g, '');
+      if (cpf) {
+        authUser = await this.prisma.authUser.findUnique({ where: { email: cpf } });
+        if (!authUser) {
+          const user = await this.prisma.user.findFirst({ where: { cpf }, select: { id: true } });
+          if (user) authUser = await this.prisma.authUser.findFirst({ where: { userId: user.id } });
+        }
+      }
+    }
+
+    if (!authUser || !authUser.status) return genericOk;
+
+    const linkedUser = authUser.userId
+      ? await this.prisma.user.findUnique({
+          where: { id: authUser.userId },
+          select: { email: true, fullName: true },
+        })
+      : null;
+
+    const deliveryEmail = linkedUser?.email?.trim() || (authUser.email.includes('@') ? authUser.email : '');
+    if (!deliveryEmail) {
+      return {
+        ...genericOk,
+        needsEmail: true,
+      };
+    }
+
+    const rawToken = crypto.randomBytes(32).toString('base64url');
+    const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+    const expiresAt = new Date(Date.now() + RESET_TOKEN_TTL_MIN * 60 * 1000);
+
+    await this.prisma.passwordResetToken.deleteMany({
+      where: { authUserId: authUser.id, usedAt: null, expiresAt: { gt: new Date() } },
+    });
+
+    await this.prisma.passwordResetToken.create({
+      data: { authUserId: authUser.id, tokenHash, expiresAt },
+    });
+
+    const baseUrl = (origin && origin.startsWith('http')) ? origin : (process.env.PUBLIC_APP_URL ?? 'https://aciavsaude.com.br');
+    const resetUrl = `${baseUrl.replace(/\/$/, '')}/redefinir-senha?token=${rawToken}`;
+
+    const { html, text } = this.emailService.renderPasswordResetEmail({
+      name: linkedUser?.fullName ?? 'beneficiário',
+      resetUrl,
+      expiresInMinutes: RESET_TOKEN_TTL_MIN,
+    });
+
+    await this.emailService.send({
+      to: deliveryEmail,
+      subject: 'Redefinir sua senha — ACIAV Saúde',
+      html,
+      text,
+    });
+
+    return genericOk;
+  }
+
+  async resetPasswordWithToken(rawToken: string, newPassword: string) {
+    if (!rawToken) throw new BadRequestException('Token inválido.');
+    if (newPassword.length < 8 || !/\d/.test(newPassword)) {
+      throw new BadRequestException('A nova senha deve ter no mínimo 8 caracteres e conter ao menos um número.');
+    }
+
+    const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+    const record = await this.prisma.passwordResetToken.findUnique({ where: { tokenHash } });
+
+    if (!record || record.usedAt || record.expiresAt < new Date()) {
+      throw new BadRequestException('Token inválido ou expirado. Solicite um novo link.');
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+
+    await this.prisma.$transaction([
+      this.prisma.authUser.update({
+        where: { id: record.authUserId },
+        data: { passwordHash, passwordChangeRequired: false },
+      }),
+      this.prisma.passwordResetToken.update({
+        where: { id: record.id },
+        data: { usedAt: new Date() },
+      }),
+      this.prisma.session.deleteMany({ where: { authUserId: record.authUserId } }),
+    ]);
+
+    return { ok: true };
+  }
+
+  async validateResetToken(rawToken: string) {
+    if (!rawToken) return { valid: false as const };
+    const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+    const record = await this.prisma.passwordResetToken.findUnique({ where: { tokenHash } });
+    if (!record || record.usedAt || record.expiresAt < new Date()) return { valid: false as const };
+    return { valid: true as const, expiresAt: record.expiresAt };
   }
 }

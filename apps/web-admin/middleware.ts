@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const PUBLIC_ROUTES = ['/', '/login'];
+const PUBLIC_ROUTES = ['/', '/login', '/esqueci-senha', '/redefinir-senha'];
 
 const ROLE_HOME: Record<string, string> = {
   super_admin: '/dashboard',
@@ -22,6 +22,9 @@ export function middleware(req: NextRequest) {
   ) {
     return NextResponse.next();
   }
+
+  const requestHeaders = new Headers(req.headers);
+  requestHeaders.set('x-pathname', pathname);
 
   const token = req.cookies.get('aciav_token')?.value;
   const role = req.cookies.get('aciav_role')?.value;
@@ -59,7 +62,7 @@ export function middleware(req: NextRequest) {
     }
   }
 
-  return NextResponse.next();
+  return NextResponse.next({ request: { headers: requestHeaders } });
 }
 
 export const config = {

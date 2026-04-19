@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation';
+import { headers } from 'next/headers';
 import { getSessionUser, serverFetch } from '../../lib/server-api';
 import SidebarPaciente from '../../components/SidebarPaciente';
 import { Bell } from 'lucide-react';
@@ -48,6 +49,15 @@ function HeaderPaciente({ name, company }: { name: string; company: string }) {
 export default async function PacienteLayout({ children }: { children: React.ReactNode }) {
   const user = await getSessionUser();
   if (!user || user.role !== 'patient') redirect('/login');
+
+  const firstAccess = await serverFetch<{ firstAccessDone: boolean }>(`/portal-paciente/first-access`);
+  const onboardingPath = '/portal-paciente/bem-vindo';
+  const needsOnboarding = firstAccess && firstAccess.firstAccessDone === false;
+  if (needsOnboarding) {
+    const h = await headers();
+    const currentPath = h.get('x-pathname') ?? '';
+    if (!currentPath.startsWith(onboardingPath)) redirect(onboardingPath);
+  }
 
   const card = await serverFetch<PatientCard>(`/users/me/card`);
   const patientName = card?.fullName ?? user.email;
