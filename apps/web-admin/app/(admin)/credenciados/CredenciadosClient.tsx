@@ -6,6 +6,7 @@ import {
   Stethoscope, Plus, Search, Pencil, Trash2, Star, Loader2, X,
   MapPin, FileText, Wrench, ChevronRight, Save, AlertCircle,
   CheckCircle2, Building2, Phone, Copy, Key, Camera, ImageIcon,
+  Tag, Settings,
 } from 'lucide-react';
 import Modal from '../../../components/Modal';
 import ExportExcelButton from '../../../components/ExportExcelButton';
@@ -44,27 +45,33 @@ interface Provider {
   _count?: { transactions: number };
 }
 
-const CATEGORIES = [
-  'Consultas', 'Exames', 'Medicamentos', 'Odontologia', 'Fisioterapia',
-  'Laboratório', 'Terapias', 'Nutrição', 'Psicologia', 'Oftalmologia', 'Outro',
-];
+interface Category {
+  id: string;
+  name: string;
+  slug: string;
+  color?: string | null;
+  order: number;
+  status: boolean;
+}
 
-const CATEGORY_STYLE: Record<string, string> = {
-  Consultas: 'bg-blue-50 text-blue-700',
-  Exames: 'bg-cyan-50 text-cyan-700',
-  Medicamentos: 'bg-orange-50 text-orange-700',
-  Odontologia: 'bg-emerald-50 text-emerald-700',
-  Fisioterapia: 'bg-rose-50 text-rose-700',
-  Laboratório: 'bg-cyan-50 text-cyan-700',
-  Terapias: 'bg-purple-50 text-purple-700',
-  Nutrição: 'bg-lime-50 text-lime-700',
-  Psicologia: 'bg-indigo-50 text-indigo-700',
-  Oftalmologia: 'bg-sky-50 text-sky-700',
-};
+const COLOR_PRESETS: Array<{ value: string; label: string }> = [
+  { value: 'bg-blue-50 text-blue-700', label: 'Azul' },
+  { value: 'bg-cyan-50 text-cyan-700', label: 'Ciano' },
+  { value: 'bg-emerald-50 text-emerald-700', label: 'Verde' },
+  { value: 'bg-rose-50 text-rose-700', label: 'Rosa' },
+  { value: 'bg-orange-50 text-orange-700', label: 'Laranja' },
+  { value: 'bg-purple-50 text-purple-700', label: 'Roxo' },
+  { value: 'bg-pink-50 text-pink-700', label: 'Pink' },
+  { value: 'bg-lime-50 text-lime-700', label: 'Lima' },
+  { value: 'bg-indigo-50 text-indigo-700', label: 'Índigo' },
+  { value: 'bg-sky-50 text-sky-700', label: 'Céu' },
+  { value: 'bg-amber-50 text-amber-700', label: 'Âmbar' },
+  { value: 'bg-slate-100 text-slate-700', label: 'Cinza' },
+];
 
 const EMPTY_FORM = {
   professionalName: '', clinicName: '', registration: '', cpfCnpj: '',
-  category: 'Consultas', specialty: '', address: '', phone: '', whatsapp: '',
+  category: '', specialty: '', address: '', phone: '', whatsapp: '',
   email: '', bio: '',
 };
 
@@ -159,7 +166,101 @@ export default function CredenciadosClient({
   const [confirmBusy, setConfirmBusy] = useState(false);
 
   const providerList = providers as Provider[];
-  const categories = Array.from(new Set(providerList.map((p) => p.category).filter(Boolean)));
+
+  // Categories CRUD
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(false);
+  const [manageCatOpen, setManageCatOpen] = useState(false);
+  const [newCatName, setNewCatName] = useState('');
+  const [newCatColor, setNewCatColor] = useState(COLOR_PRESETS[0].value);
+  const [catBusy, setCatBusy] = useState<string | null>(null);
+  const [catEditingId, setCatEditingId] = useState<string | null>(null);
+  const [catEditName, setCatEditName] = useState('');
+  const [catEditColor, setCatEditColor] = useState('');
+  const [catError, setCatError] = useState('');
+  const [catDeleteTarget, setCatDeleteTarget] = useState<Category | null>(null);
+
+  const categoryStyleMap = Object.fromEntries(
+    categories.map((c) => [c.name, c.color || 'bg-slate-100 text-slate-700']),
+  ) as Record<string, string>;
+
+  async function loadCategories() {
+    setCategoriesLoading(true);
+    try {
+      const data = await api.get('/categories') as Category[];
+      setCategories(Array.isArray(data) ? data : []);
+    } catch {
+      setCategories([]);
+    } finally {
+      setCategoriesLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    loadCategories();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function handleCreateCategory() {
+    const name = newCatName.trim();
+    if (name.length < 2) { setCatError('Nome deve ter pelo menos 2 caracteres.'); return; }
+    setCatBusy('new');
+    setCatError('');
+    try {
+      await api.post('/categories', { name, color: newCatColor });
+      setNewCatName('');
+      setNewCatColor(COLOR_PRESETS[0].value);
+      await loadCategories();
+    } catch (err: any) {
+      setCatError(err?.message || 'Erro ao criar categoria.');
+    } finally {
+      setCatBusy(null);
+    }
+  }
+
+  function startEditCategory(c: Category) {
+    setCatEditingId(c.id);
+    setCatEditName(c.name);
+    setCatEditColor(c.color || COLOR_PRESETS[0].value);
+    setCatError('');
+  }
+
+  function cancelEditCategory() {
+    setCatEditingId(null);
+    setCatEditName('');
+    setCatEditColor('');
+  }
+
+  async function handleUpdateCategory(id: string) {
+    const name = catEditName.trim();
+    if (name.length < 2) { setCatError('Nome deve ter pelo menos 2 caracteres.'); return; }
+    setCatBusy(id);
+    setCatError('');
+    try {
+      await api.put(`/categories/${id}`, { name, color: catEditColor });
+      cancelEditCategory();
+      await loadCategories();
+      startTransition(() => router.refresh());
+    } catch (err: any) {
+      setCatError(err?.message || 'Erro ao atualizar categoria.');
+    } finally {
+      setCatBusy(null);
+    }
+  }
+
+  async function handleDeleteCategory(id: string) {
+    setCatBusy(id);
+    setCatError('');
+    try {
+      await api.delete(`/categories/${id}`);
+      setCatDeleteTarget(null);
+      await loadCategories();
+    } catch (err: any) {
+      setCatError(err?.message || 'Erro ao excluir categoria.');
+    } finally {
+      setCatBusy(null);
+    }
+  }
 
   const lista = providerList.filter((p) => {
     const matchSearch = !search ||
@@ -252,7 +353,7 @@ export default function CredenciadosClient({
 
   function openCreate() {
     setEditingId(null);
-    setForm(EMPTY_FORM);
+    setForm({ ...EMPTY_FORM, category: categories[0]?.name ?? '' });
     setError('');
     setTempPassword(null);
     setModalOpen(true);
@@ -493,14 +594,25 @@ export default function CredenciadosClient({
               className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
             />
           </div>
-          <select
-            value={categoryFilter}
-            onChange={(e) => setCategoryFilter(e.target.value)}
-            className="bg-white border border-gray-200 text-sm rounded-lg px-4 py-2 text-slate-700 outline-none"
-          >
-            <option value="todos">Todas as Categorias</option>
-            {categories.map((cat) => <option key={cat} value={cat}>{cat}</option>)}
-          </select>
+          <div className="flex items-center gap-2">
+            <select
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value)}
+              className="bg-white border border-gray-200 text-sm rounded-lg px-4 py-2 text-slate-700 outline-none"
+            >
+              <option value="todos">Todas as Categorias</option>
+              {categories.map((cat) => <option key={cat.id} value={cat.name}>{cat.name}</option>)}
+            </select>
+            <button
+              type="button"
+              onClick={() => { setManageCatOpen(true); setCatError(''); cancelEditCategory(); }}
+              className="inline-flex items-center gap-1.5 bg-white border border-gray-200 hover:bg-slate-50 text-slate-700 text-sm rounded-lg px-3 py-2"
+              title="Gerenciar categorias"
+            >
+              <Settings size={14} />
+              Gerenciar categorias
+            </button>
+          </div>
         </div>
 
         {lista.length === 0 ? (
@@ -523,7 +635,7 @@ export default function CredenciadosClient({
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {lista.map((p) => {
-                  const style = CATEGORY_STYLE[p.category] ?? 'bg-slate-50 text-slate-600';
+                  const style = categoryStyleMap[p.category] ?? 'bg-slate-50 text-slate-600';
                   return (
                     <tr
                       key={p.id}
@@ -605,14 +717,14 @@ export default function CredenciadosClient({
                 {drawerProvider.photoUrl ? (
                   <img src={drawerProvider.photoUrl} alt="" className="w-11 h-11 rounded-xl object-cover" />
                 ) : (
-                  <div className={`p-2.5 rounded-xl ${CATEGORY_STYLE[drawerProvider.category] ?? 'bg-slate-100 text-slate-600'}`}>
+                  <div className={`p-2.5 rounded-xl ${categoryStyleMap[drawerProvider.category] ?? 'bg-slate-100 text-slate-600'}`}>
                     <Building2 size={20} />
                   </div>
                 )}
                 <div>
                   <h2 className="font-bold text-slate-800 text-lg leading-tight">{drawerProvider.name}</h2>
                   <div className="flex items-center gap-2 mt-0.5">
-                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${CATEGORY_STYLE[drawerProvider.category] ?? 'bg-slate-100 text-slate-600'}`}>
+                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${categoryStyleMap[drawerProvider.category] ?? 'bg-slate-100 text-slate-600'}`}>
                       {drawerProvider.category}
                     </span>
                     {drawerProvider.specialty && (
@@ -1149,7 +1261,8 @@ export default function CredenciadosClient({
                       onChange={(e) => setForm({ ...form, category: e.target.value })}
                       className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-slate-50"
                     >
-                      {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                      <option value="">Selecione...</option>
+                      {categories.map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}
                     </select>
                   </div>
                   <div>
@@ -1232,6 +1345,170 @@ export default function CredenciadosClient({
         busy={confirmBusy}
         onConfirm={confirmDeleteService}
         onClose={() => !confirmBusy && setDeleteServiceTarget(null)}
+      />
+
+      {manageCatOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <Tag size={18} className="text-primary" />
+                <h3 className="text-base font-bold text-slate-800">Gerenciar Categorias</h3>
+              </div>
+              <button
+                onClick={() => { setManageCatOpen(false); cancelEditCategory(); setCatError(''); }}
+                className="text-slate-400 hover:text-slate-600"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="px-6 py-5 overflow-y-auto flex-1 space-y-5">
+              <div className="border border-slate-200 rounded-xl p-4 bg-slate-50/50">
+                <h4 className="text-sm font-bold text-slate-700 mb-3">Nova categoria</h4>
+                <div className="grid grid-cols-1 md:grid-cols-[1fr_200px_auto] gap-2">
+                  <input
+                    type="text"
+                    value={newCatName}
+                    onChange={(e) => setNewCatName(e.target.value)}
+                    placeholder="Ex.: Oftalmologia"
+                    className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 bg-white"
+                  />
+                  <select
+                    value={newCatColor}
+                    onChange={(e) => setNewCatColor(e.target.value)}
+                    className="border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white"
+                  >
+                    {COLOR_PRESETS.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={handleCreateCategory}
+                    disabled={catBusy === 'new'}
+                    className="inline-flex items-center gap-1.5 bg-primary text-white hover:bg-primary-dark disabled:opacity-60 px-4 py-2 rounded-lg text-sm font-bold"
+                  >
+                    {catBusy === 'new' ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+                    Adicionar
+                  </button>
+                </div>
+                <div className="mt-2">
+                  <span className={`inline-block text-xs font-semibold px-2 py-0.5 rounded-md ${newCatColor}`}>
+                    {newCatName.trim() || 'Prévia'}
+                  </span>
+                </div>
+              </div>
+
+              {catError && (
+                <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-3 py-2 rounded-lg">{catError}</div>
+              )}
+
+              <div>
+                <h4 className="text-sm font-bold text-slate-700 mb-2">Categorias existentes</h4>
+                {categoriesLoading ? (
+                  <div className="py-8 text-center text-slate-400 text-sm">
+                    <Loader2 size={20} className="animate-spin mx-auto mb-2" />
+                    Carregando...
+                  </div>
+                ) : categories.length === 0 ? (
+                  <div className="py-8 text-center text-slate-400 text-sm">
+                    Nenhuma categoria cadastrada.
+                  </div>
+                ) : (
+                  <ul className="divide-y divide-slate-100 border border-slate-200 rounded-xl overflow-hidden">
+                    {categories.map((c) => (
+                      <li key={c.id} className="px-4 py-3">
+                        {catEditingId === c.id ? (
+                          <div className="grid grid-cols-1 md:grid-cols-[1fr_200px_auto] gap-2 items-center">
+                            <input
+                              type="text"
+                              value={catEditName}
+                              onChange={(e) => setCatEditName(e.target.value)}
+                              className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 bg-white"
+                            />
+                            <select
+                              value={catEditColor}
+                              onChange={(e) => setCatEditColor(e.target.value)}
+                              className="border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white"
+                            >
+                              {COLOR_PRESETS.map((cp) => <option key={cp.value} value={cp.value}>{cp.label}</option>)}
+                            </select>
+                            <div className="flex items-center gap-2 justify-end">
+                              <button
+                                type="button"
+                                onClick={() => handleUpdateCategory(c.id)}
+                                disabled={catBusy === c.id}
+                                className="inline-flex items-center gap-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-2 rounded-lg disabled:opacity-60"
+                              >
+                                {catBusy === c.id ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
+                                Salvar
+                              </button>
+                              <button
+                                type="button"
+                                onClick={cancelEditCategory}
+                                disabled={catBusy === c.id}
+                                className="text-slate-500 hover:text-slate-700 text-xs font-bold px-3 py-2"
+                              >
+                                Cancelar
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className={`inline-block text-xs font-semibold px-2 py-0.5 rounded-md ${c.color || 'bg-slate-100 text-slate-700'}`}>
+                                {c.name}
+                              </span>
+                              <span className="text-xs text-slate-400 truncate">/{c.slug}</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => startEditCategory(c)}
+                                className="p-2 text-slate-500 hover:text-primary hover:bg-primary/10 rounded-lg"
+                                title="Editar"
+                              >
+                                <Pencil size={14} />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setCatDeleteTarget(c)}
+                                className="p-2 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg"
+                                title="Excluir"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+
+            <div className="px-6 py-4 border-t border-slate-100 bg-slate-50/50 flex justify-end">
+              <button
+                type="button"
+                onClick={() => { setManageCatOpen(false); cancelEditCategory(); setCatError(''); }}
+                className="px-4 py-2 text-sm font-bold text-slate-700 hover:text-slate-900"
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <ConfirmDeleteDialog
+        open={!!catDeleteTarget}
+        title="Excluir categoria"
+        description="Esta categoria será removida. Digite CONFIRMAR para prosseguir."
+        targetLabel={catDeleteTarget?.name}
+        confirmButtonLabel="Excluir"
+        busy={catBusy === catDeleteTarget?.id}
+        onConfirm={async () => { if (catDeleteTarget) await handleDeleteCategory(catDeleteTarget.id); }}
+        onClose={() => { if (catBusy !== catDeleteTarget?.id) setCatDeleteTarget(null); }}
       />
     </div>
   );

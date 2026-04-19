@@ -21,6 +21,7 @@ import { PortalRhModule } from './portal-rh/portal-rh.module';
 import { AuthUsersModule } from './auth-users/auth-users.module';
 import { BackupModule } from './backup/backup.module';
 import { WebhooksModule } from './webhooks/webhooks.module';
+import { CategoriesModule } from './categories/categories.module';
 import { ReadOnlyProviderGuard } from './common/guards/read-only-role.guard';
 
 @Module({
@@ -43,6 +44,7 @@ import { ReadOnlyProviderGuard } from './common/guards/read-only-role.guard';
     AuthUsersModule,
     BackupModule,
     WebhooksModule,
+    CategoriesModule,
   ],
   controllers: [AppController],
   providers: [

@@ -20,10 +20,11 @@ model Unit {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
-  companies Company[]
-  users     User[]
-  providers Provider[]
-  auditLogs AuditLog[]
+  companies  Company[]
+  users      User[]
+  providers  Provider[]
+  auditLogs  AuditLog[]
+  categories Category[]
 }
 
 model Company {
@@ -306,4 +307,21 @@ model WebhookDelivery {
   webhook Webhook @relation(fields: [webhookId], references: [id], onDelete: Cascade)
 
   @@index([webhookId, deliveredAt])
+}
+
+model Category {
+  id        String   @id @default(uuid())
+  unitId    String
+  name      String
+  slug      String
+  color     String?  // Ex.: 'bg-blue-50 text-blue-700'
+  order     Int      @default(0)
+  status    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  unit Unit @relation(fields: [unitId], references: [id], onDelete: Cascade)
+
+  @@unique([unitId, slug])
+  @@index([unitId, order])
 }
