@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import Modal from '../../../components/Modal';
 import ExportExcelButton from '../../../components/ExportExcelButton';
+import ConfirmDeleteDialog from '../../../components/ConfirmDeleteDialog';
 import { api } from '../../../lib/api-client';
 
 interface Service {
@@ -146,6 +147,12 @@ export default function CredenciadosClient({
   // Copied feedback
   const [copied, setCopied] = useState(false);
 
+  // Confirmation dialogs
+  const [resetTarget, setResetTarget] = useState<Provider | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Provider | null>(null);
+  const [deleteServiceTarget, setDeleteServiceTarget] = useState<Service | null>(null);
+  const [confirmBusy, setConfirmBusy] = useState(false);
+
   const providerList = providers as Provider[];
   const categories = Array.from(new Set(providerList.map((p) => p.category).filter(Boolean)));
 
@@ -219,17 +226,20 @@ export default function CredenciadosClient({
     }
   }
 
-  async function handleResetPassword(providerId: string) {
-    if (!confirm('Resetar a senha deste credenciado? Todas as sessões ativas serão encerradas.')) return;
+  async function confirmResetPassword() {
+    if (!resetTarget) return;
+    setConfirmBusy(true);
     setResettingPassword(true);
     setResetResult(null);
     try {
-      const result = await api.post(`/auth/reset-password/provider/${providerId}`, {}) as { tempPassword: string; email: string };
+      const result = await api.post(`/auth/reset-password/provider/${resetTarget.id}`, {}) as { tempPassword: string; email: string };
       setResetResult(result);
+      setResetTarget(null);
     } catch {
       alert('Erro ao resetar senha. Verifique se o credenciado possui login cadastrado.');
     } finally {
       setResettingPassword(false);
+      setConfirmBusy(false);
     }
   }
 
@@ -322,14 +332,22 @@ export default function CredenciadosClient({
     }
   }
 
-  async function handleDelete(p: Provider, e: React.MouseEvent) {
+  function handleDelete(p: Provider, e: React.MouseEvent) {
     e.stopPropagation();
-    if (!confirm(`Inativar "${p.name}"?`)) return;
+    setDeleteTarget(p);
+  }
+
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+    setConfirmBusy(true);
     try {
-      await api.delete(`/providers/${p.id}`);
+      await api.delete(`/providers/${deleteTarget.id}`);
+      setDeleteTarget(null);
       startTransition(() => router.refresh());
     } catch {
       alert('Erro ao inativar credenciado.');
+    } finally {
+      setConfirmBusy(false);
     }
   }
 
@@ -406,17 +424,25 @@ export default function CredenciadosClient({
     }
   }
 
-  async function handleDeleteService(id: string) {
-    if (!confirm('Remover este serviço?')) return;
+  function handleDeleteService(s: Service) {
+    setDeleteServiceTarget(s);
+  }
+
+  async function confirmDeleteService() {
+    if (!deleteServiceTarget) return;
+    const id = deleteServiceTarget.id;
+    setConfirmBusy(true);
     setDeletingService(id);
     try {
       await api.delete(`/providers/services/${id}`);
       setServices((prev) => prev.filter((s) => s.id !== id));
+      setDeleteServiceTarget(null);
       showServiceToast('Serviço removido.');
     } catch {
       showServiceToast('Erro ao remover serviço.', 'err');
     } finally {
       setDeletingService('');
+      setConfirmBusy(false);
     }
   }
 
@@ -732,7 +758,7 @@ export default function CredenciadosClient({
                           <p className="text-sm text-blue-800 font-medium mt-0.5">{drawerProvider.email}</p>
                         </div>
                         <button
-                          onClick={() => handleResetPassword(drawerProvider.id)}
+                          onClick={() => setResetTarget(drawerProvider)}
                           disabled={resettingPassword}
                           className="text-xs font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1.5 shrink-0"
                         >
@@ -844,7 +870,7 @@ export default function CredenciadosClient({
                               <Pencil size={14} />
                             </button>
                             <button
-                              onClick={() => handleDeleteService(s.id)}
+                              onClick={() => handleDeleteService(s)}
                               disabled={deletingService === s.id}
                               className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
                               title="Remover"
@@ -1198,6 +1224,39 @@ export default function CredenciadosClient({
           )}
         </div>
       </Modal>
+
+      <ConfirmDeleteDialog
+        open={!!deleteTarget}
+        title="Inativar credenciado"
+        description="O credenciado deixará de aparecer para pacientes. Digite CONFIRMAR para prosseguir."
+        targetLabel={deleteTarget?.name}
+        confirmButtonLabel="Inativar"
+        busy={confirmBusy}
+        onConfirm={confirmDelete}
+        onClose={() => !confirmBusy && setDeleteTarget(null)}
+      />
+
+      <ConfirmDeleteDialog
+        open={!!resetTarget}
+        title="Resetar senha do credenciado"
+        description="Será gerada uma nova senha temporária e todas as sessões ativas serão encerradas."
+        targetLabel={resetTarget?.email ?? resetTarget?.name}
+        confirmButtonLabel="Resetar senha"
+        busy={confirmBusy}
+        onConfirm={confirmResetPassword}
+        onClose={() => !confirmBusy && setResetTarget(null)}
+      />
+
+      <ConfirmDeleteDialog
+        open={!!deleteServiceTarget}
+        title="Remover serviço"
+        description="O serviço será removido permanentemente. Digite CONFIRMAR para prosseguir."
+        targetLabel={deleteServiceTarget?.description}
+        confirmButtonLabel="Remover"
+        busy={confirmBusy}
+        onConfirm={confirmDeleteService}
+        onClose={() => !confirmBusy && setDeleteServiceTarget(null)}
+      />
     </div>
   );
 }

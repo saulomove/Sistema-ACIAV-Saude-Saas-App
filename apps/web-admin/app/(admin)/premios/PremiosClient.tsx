@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Gift, Plus, QrCode, Search, Award, Pencil, Trash2, X } from 'lucide-react';
+import ConfirmDeleteDialog from '../../../components/ConfirmDeleteDialog';
 
 interface Reward {
   id: string;
@@ -29,6 +30,8 @@ export default function PremiosClient({ initialRewards, providers }: PremiosClie
   const [form, setForm] = useState({ providerId: '', name: '', pointsRequired: '', stock: '' });
   const [saving, setSaving] = useState(false);
   const [voucherCode, setVoucherCode] = useState('');
+  const [deleteTarget, setDeleteTarget] = useState<Reward | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
 
   const filtered = rewards.filter((r) =>
     r.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -74,10 +77,20 @@ export default function PremiosClient({ initialRewards, providers }: PremiosClie
     }
   }
 
-  async function handleDelete(id: string) {
-    if (!confirm('Deseja excluir este prêmio?')) return;
-    const res = await fetch(`/internal/api/rewards/${id}`, { method: 'DELETE' });
-    if (res.ok) setRewards((prev) => prev.filter((r) => r.id !== id));
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+    setDeleteBusy(true);
+    try {
+      const res = await fetch(`/internal/api/rewards/${deleteTarget.id}`, { method: 'DELETE' });
+      if (res.ok) {
+        setRewards((prev) => prev.filter((r) => r.id !== deleteTarget.id));
+        setDeleteTarget(null);
+      } else {
+        alert('Erro ao excluir prêmio.');
+      }
+    } finally {
+      setDeleteBusy(false);
+    }
   }
 
   return (
@@ -170,7 +183,7 @@ export default function PremiosClient({ initialRewards, providers }: PremiosClie
                     </div>
                     <div className="flex items-center gap-2">
                       <button onClick={() => openEdit(item)} className="text-slate-400 hover:text-primary transition-colors"><Pencil size={16} /></button>
-                      <button onClick={() => handleDelete(item.id)} className="text-slate-400 hover:text-red-500 transition-colors"><Trash2 size={16} /></button>
+                      <button onClick={() => setDeleteTarget(item)} className="text-slate-400 hover:text-red-500 transition-colors"><Trash2 size={16} /></button>
                     </div>
                   </div>
                 </div>
@@ -249,6 +262,17 @@ export default function PremiosClient({ initialRewards, providers }: PremiosClie
           </div>
         </div>
       )}
+
+      <ConfirmDeleteDialog
+        open={!!deleteTarget}
+        title="Excluir prêmio"
+        description="O prêmio será removido permanentemente do catálogo. Digite CONFIRMAR para prosseguir."
+        targetLabel={deleteTarget?.name}
+        confirmButtonLabel="Excluir"
+        busy={deleteBusy}
+        onConfirm={confirmDelete}
+        onClose={() => !deleteBusy && setDeleteTarget(null)}
+      />
     </div>
   );
 }

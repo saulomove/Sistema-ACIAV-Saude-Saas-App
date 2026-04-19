@@ -12,7 +12,7 @@ const menuItems = [
   { name: 'Dependentes', icon: Users, href: '/portal-paciente/dependentes' },
   { name: 'Guia Médico', icon: Search, href: '/portal-paciente/guia' },
   { name: 'Meu Histórico de Uso', icon: ActivitySquare, href: '/portal-paciente/historico' },
-  { name: 'Resgatar Prêmios', icon: Gift, href: '/portal-paciente/premios' },
+  { name: 'Resgatar Prêmios', icon: Gift, href: '/portal-paciente/premios', soon: true },
   { name: 'Configurações', icon: Settings, href: '/portal-paciente/configuracoes' },
 ];
 
@@ -97,7 +97,12 @@ export default function SidebarPaciente({
               )}
             >
               <Icon size={20} className={isActive ? 'text-[#007178]' : 'text-white/50'} />
-              {item.name}
+              <span className="flex-1">{item.name}</span>
+              {item.soon && (
+                <span className="text-[9px] font-black uppercase tracking-wider bg-amber-400/90 text-slate-900 px-1.5 py-0.5 rounded-full">
+                  Em breve
+                </span>
+              )}
             </Link>
           );
         })}

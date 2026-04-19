@@ -18,6 +18,7 @@ import { ExportModule } from './export/export.module';
 import { EmailModule } from './email/email.module';
 import { PortalPacienteModule } from './portal-paciente/portal-paciente.module';
 import { PortalRhModule } from './portal-rh/portal-rh.module';
+import { ReadOnlyProviderGuard } from './common/guards/read-only-role.guard';
 
 @Module({
   imports: [
@@ -41,6 +42,7 @@ import { PortalRhModule } from './portal-rh/portal-rh.module';
   providers: [
     AppService,
     { provide: APP_GUARD, useClass: ThrottlerGuard },
+    { provide: APP_GUARD, useClass: ReadOnlyProviderGuard },
     { provide: APP_INTERCEPTOR, useClass: AuditInterceptor },
   ],
 })

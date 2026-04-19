@@ -59,11 +59,17 @@ export class TransactionsService {
     return tx;
   }
 
-  async findByProvider(providerId: string, page = 1, limit = 20) {
+  async findByProvider(providerId: string, page = 1, limit = 20, opts: { startDate?: string; endDate?: string } = {}) {
     const skip = (page - 1) * limit;
+    const where: any = { providerId };
+    if (opts.startDate || opts.endDate) {
+      where.createdAt = {};
+      if (opts.startDate) where.createdAt.gte = new Date(opts.startDate + 'T00:00:00');
+      if (opts.endDate) where.createdAt.lte = new Date(opts.endDate + 'T23:59:59.999');
+    }
     const [items, total] = await Promise.all([
       this.prisma.transaction.findMany({
-        where: { providerId },
+        where,
         include: {
           user: { select: { fullName: true, cpf: true } },
           service: { select: { description: true, discountedPrice: true, originalPrice: true } },
@@ -72,7 +78,7 @@ export class TransactionsService {
         skip,
         take: limit,
       }),
-      this.prisma.transaction.count({ where: { providerId } }),
+      this.prisma.transaction.count({ where }),
     ]);
     return { items, total, page, limit };
   }

@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { getSessionUser, serverFetch } from '../../../../lib/server-api';
-import { Clock, TrendingUp, DollarSign, Users } from 'lucide-react';
+import { Clock, DollarSign, Users } from 'lucide-react';
+import HistoricoFiltros from './HistoricoFiltros';
 
 interface Transaction {
   id: string;
@@ -29,16 +30,26 @@ function maskCPF(cpf: string) {
   return cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
 }
 
-export default async function HistoricoPage() {
+export default async function HistoricoPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ startDate?: string; endDate?: string }>;
+}) {
   const user = await getSessionUser();
   if (!user || user.role !== 'provider') redirect('/login');
 
   const providerId = user.providerId ?? '';
-  const data = await serverFetch<TxResponse>(`/transactions/by-provider?providerId=${providerId}&limit=50`) ?? { items: [], total: 0 };
+  const params = await searchParams;
+  const qs = new URLSearchParams();
+  qs.set('providerId', providerId);
+  qs.set('limit', '100');
+  if (params.startDate) qs.set('startDate', params.startDate);
+  if (params.endDate) qs.set('endDate', params.endDate);
+
+  const data = await serverFetch<TxResponse>(`/transactions/by-provider?${qs.toString()}`) ?? { items: [], total: 0, page: 1, limit: 100 };
   const transactions = data.items;
 
   const totalAtendimentos = data.total;
-  const totalEconomia = transactions.reduce((sum, t) => sum + Number(t.amountSaved), 0);
   const totalFaturamento = transactions.reduce((sum, t) => sum + Number(t.service.discountedPrice), 0);
   const pacientesUnicos = new Set(transactions.map((t) => t.user.cpf)).size;
 
@@ -46,11 +57,13 @@ export default async function HistoricoPage() {
     <div className="max-w-5xl mx-auto space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-slate-800">Histórico de Atendimentos</h1>
-        <p className="text-slate-500 text-sm mt-1">Todos os atendimentos registrados por esta clínica.</p>
+        <p className="text-slate-500 text-sm mt-1">Todos os atendimentos registrados pela ACIAV para esta clínica.</p>
       </div>
 
+      <HistoricoFiltros initialStart={params.startDate ?? ''} initialEnd={params.endDate ?? ''} />
+
       {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
         <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
           <div className="flex items-center gap-2 mb-2">
             <Clock size={18} className="text-[#007178]" />
@@ -65,19 +78,12 @@ export default async function HistoricoPage() {
           </div>
           <p className="text-3xl font-black text-slate-800">{pacientesUnicos}</p>
         </div>
-        <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+        <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 col-span-2 md:col-span-1">
           <div className="flex items-center gap-2 mb-2">
             <DollarSign size={18} className="text-[#007178]" />
             <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">Faturamento</p>
           </div>
           <p className="text-2xl font-black text-slate-800">{fmtMoney(totalFaturamento)}</p>
-        </div>
-        <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-          <div className="flex items-center gap-2 mb-2">
-            <TrendingUp size={18} className="text-emerald-500" />
-            <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">Economia Gerada</p>
-          </div>
-          <p className="text-2xl font-black text-emerald-600">{fmtMoney(totalEconomia)}</p>
         </div>
       </div>
 
@@ -86,8 +92,8 @@ export default async function HistoricoPage() {
         {transactions.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-slate-400">
             <Clock size={40} className="mb-3 opacity-30" />
-            <p className="font-medium">Nenhum atendimento registrado ainda</p>
-            <p className="text-sm mt-1">Os atendimentos registrados no Balcão aparecerão aqui.</p>
+            <p className="font-medium">Nenhum atendimento encontrado</p>
+            <p className="text-sm mt-1">Ajuste os filtros ou aguarde novos registros da ACIAV.</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -98,7 +104,6 @@ export default async function HistoricoPage() {
                   <th className="text-left px-6 py-3 font-bold">Paciente</th>
                   <th className="text-left px-6 py-3 font-bold">Serviço</th>
                   <th className="text-right px-6 py-3 font-bold">Valor Pago</th>
-                  <th className="text-right px-6 py-3 font-bold">Economia</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
@@ -111,11 +116,6 @@ export default async function HistoricoPage() {
                     </td>
                     <td className="px-6 py-4 text-slate-600">{t.service.description}</td>
                     <td className="px-6 py-4 text-right font-bold text-[#007178]">{fmtMoney(Number(t.service.discountedPrice))}</td>
-                    <td className="px-6 py-4 text-right">
-                      <span className="bg-emerald-100 text-emerald-700 text-xs font-bold px-2.5 py-1 rounded-full">
-                        {fmtMoney(Number(t.amountSaved))}
-                      </span>
-                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -123,8 +123,8 @@ export default async function HistoricoPage() {
           </div>
         )}
       </div>
-      {data.total > 50 && (
-        <p className="text-center text-xs text-slate-400">Exibindo os 50 atendimentos mais recentes de {data.total} no total.</p>
+      {data.total > 100 && (
+        <p className="text-center text-xs text-slate-400">Exibindo os 100 atendimentos mais recentes de {data.total} no total.</p>
       )}
     </div>
   );

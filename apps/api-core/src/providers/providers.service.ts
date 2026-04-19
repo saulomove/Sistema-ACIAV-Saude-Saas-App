@@ -7,11 +7,19 @@ import { PrismaService } from '../prisma/prisma.service';
 export class ProvidersService {
   constructor(private prisma: PrismaService) {}
 
-  async findAll(unitId?: string, category?: string, search?: string, page = 1, limit = 50) {
+  async findAll(
+    unitId?: string,
+    category?: string,
+    search?: string,
+    page = 1,
+    limit = 50,
+    opts: { city?: string; sortBy?: string } = {},
+  ) {
     const skip = (page - 1) * limit;
     const where = {
       ...(unitId && { unitId, status: true }),
       ...(category && { category }),
+      ...(opts.city && { city: { equals: opts.city, mode: 'insensitive' as const } }),
       ...(search && {
         OR: [
           { name: { contains: search, mode: 'insensitive' as const } },
@@ -21,10 +29,38 @@ export class ProvidersService {
         ],
       }),
     };
+
+    if (opts.sortBy === 'discount') {
+      const rawData = await this.prisma.provider.findMany({
+        where,
+        include: {
+          _count: { select: { transactions: true, services: true } },
+          services: { select: { id: true, description: true, discountMaxPercent: true, originalPrice: true, discountedPrice: true } },
+        },
+      });
+      const scored = rawData.map((p) => {
+        const best = p.services.reduce((acc, s) => {
+          const pct = s.discountMaxPercent
+            ?? (Number(s.originalPrice) > 0
+              ? Math.round(((Number(s.originalPrice) - Number(s.discountedPrice)) / Number(s.originalPrice)) * 100)
+              : 0);
+          return Math.max(acc, pct);
+        }, 0);
+        return { ...p, bestDiscount: best };
+      });
+      scored.sort((a, b) => (b.bestDiscount || 0) - (a.bestDiscount || 0) || (b.rankingScore - a.rankingScore));
+      const total = scored.length;
+      const paged = scored.slice(skip, skip + limit);
+      return { data: paged, total, page, limit, totalPages: Math.ceil(total / limit) };
+    }
+
     const [data, total] = await Promise.all([
       this.prisma.provider.findMany({
         where,
-        include: { _count: { select: { transactions: true, services: true } } },
+        include: {
+          _count: { select: { transactions: true, services: true } },
+          services: { select: { id: true, description: true, discountMaxPercent: true, originalPrice: true, discountedPrice: true } },
+        },
         orderBy: { rankingScore: 'desc' },
         skip,
         take: limit,
@@ -32,6 +68,40 @@ export class ProvidersService {
       this.prisma.provider.count({ where }),
     ]);
     return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
+  }
+
+  async listCities(unitId: string) {
+    if (!unitId) return [];
+    const rows = await this.prisma.provider.findMany({
+      where: { unitId, status: true, city: { not: null } },
+      distinct: ['city'],
+      select: { city: true },
+      orderBy: { city: 'asc' },
+    });
+    return rows.map((r) => r.city).filter((c): c is string => !!c);
+  }
+
+  async listCategories(unitId: string) {
+    if (!unitId) return [];
+    const rows = await this.prisma.provider.findMany({
+      where: { unitId, status: true },
+      distinct: ['category'],
+      select: { category: true },
+      orderBy: { category: 'asc' },
+    });
+    return rows.map((r) => r.category).filter(Boolean);
+  }
+
+  async trackClick(providerId: string, data: { userId: string | null; channel: string; ip: string | null; userAgent: string | null }) {
+    return this.prisma.providerContactClick.create({
+      data: {
+        providerId,
+        userId: data.userId,
+        channel: data.channel,
+        ip: data.ip,
+        userAgent: data.userAgent?.slice(0, 500),
+      },
+    });
   }
 
   async findOne(id: string) {

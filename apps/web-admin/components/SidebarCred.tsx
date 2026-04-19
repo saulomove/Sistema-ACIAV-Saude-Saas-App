@@ -2,27 +2,32 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Stethoscope, Clock, ShieldCheck, Gift, LogOut, Wrench, Menu, X, Settings } from 'lucide-react';
+import { Clock, LogOut, Wrench, Menu, X, Settings, LayoutDashboard, MessageCircle } from 'lucide-react';
 import Image from 'next/image';
 import clsx from 'clsx';
 import { useState } from 'react';
 
 const menuItems = [
-  { name: 'Atendimento', icon: ShieldCheck, href: '/portal-credenciado' },
+  { name: 'Painel', icon: LayoutDashboard, href: '/portal-credenciado' },
   { name: 'Meus Serviços', icon: Wrench, href: '/portal-credenciado/servicos' },
   { name: 'Histórico', icon: Clock, href: '/portal-credenciado/historico' },
-  { name: 'Gamificação', icon: Gift, href: '/portal-credenciado/gamificacao' },
   { name: 'Configurações', icon: Settings, href: '/portal-credenciado/configuracoes' },
 ];
 
+function whatsLink(raw?: string | null) {
+  const d = (raw || '').replace(/\D/g, '');
+  return d ? `https://wa.me/55${d}?text=${encodeURIComponent('Olá, preciso de suporte no portal do credenciado.')}` : null;
+}
+
 export default function SidebarCred({
-  providerId,
   providerName,
   providerCategory,
+  supportWhatsapp,
 }: {
   providerId: string;
   providerName: string;
   providerCategory: string;
+  supportWhatsapp?: string | null;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -32,6 +37,8 @@ export default function SidebarCred({
     await fetch('/internal/logout', { method: 'POST' });
     router.push('/login');
   }
+
+  const supportHref = whatsLink(supportWhatsapp);
 
   return (
     <>
@@ -99,7 +106,17 @@ export default function SidebarCred({
       </nav>
 
       {/* Footer */}
-      <div className="p-4 border-t border-white/20">
+      <div className="p-4 border-t border-white/20 space-y-3">
+        {supportHref && (
+          <a
+            href={supportHref}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 text-xs text-white bg-emerald-500/90 hover:bg-emerald-500 transition-colors w-full px-3 py-2.5 rounded-xl font-bold"
+          >
+            <MessageCircle size={14} /> Suporte via WhatsApp
+          </a>
+        )}
         <button
           onClick={handleLogout}
           className="flex items-center gap-2 text-xs text-red-300 hover:text-red-200 transition-colors w-full px-2 py-2 font-bold"

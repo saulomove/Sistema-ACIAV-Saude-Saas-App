@@ -5,6 +5,7 @@ import { Bell } from 'lucide-react';
 import Image from 'next/image';
 
 interface Provider { id: string; name: string; professionalName?: string; clinicName?: string; category: string; specialty?: string; }
+interface Unit { id: string; supportWhatsapp?: string | null }
 
 function HeaderCred({ name, category }: { name: string; category: string }) {
   const initials = name.split(' ').slice(0, 2).map((n) => n[0]).join('').toUpperCase();
@@ -53,12 +54,19 @@ export default async function CredenciadoLayout({ children }: { children: React.
     }
   }
 
+  let supportWhatsapp: string | null = null;
+  if (user.unitId) {
+    const unit = await serverFetch<Unit>(`/units/${user.unitId}`);
+    supportWhatsapp = unit?.supportWhatsapp ?? null;
+  }
+
   return (
     <div className="flex h-screen overflow-hidden">
       <SidebarCred
         providerId={user.providerId ?? ''}
         providerName={providerName}
         providerCategory={providerCategory}
+        supportWhatsapp={supportWhatsapp}
       />
       <div className="flex flex-col flex-1 overflow-hidden w-full bg-slate-50">
         <HeaderCred name={providerName} category={providerCategory} />

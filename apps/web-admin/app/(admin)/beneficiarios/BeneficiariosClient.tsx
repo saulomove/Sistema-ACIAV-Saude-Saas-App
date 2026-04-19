@@ -10,6 +10,7 @@ import {
 import * as XLSX from 'xlsx';
 import Modal from '../../../components/Modal';
 import ExportExcelButton from '../../../components/ExportExcelButton';
+import ConfirmDeleteDialog from '../../../components/ConfirmDeleteDialog';
 import { api } from '../../../lib/api-client';
 
 interface Company {
@@ -200,6 +201,8 @@ export default function BeneficiariosClient({
 
   const [resettingPassword, setResettingPassword] = useState(false);
   const [resetResult, setResetResult] = useState<{ tempPassword: string; email: string } | null>(null);
+  const [resetTarget, setResetTarget] = useState<User | null>(null);
+  const [resetBusy, setResetBusy] = useState(false);
   const [copied, setCopied] = useState(false);
 
   const [inactivateTarget, setInactivateTarget] = useState<User | null>(null);
@@ -258,17 +261,20 @@ export default function BeneficiariosClient({
     setTimeout(() => setCopied(false), 2500);
   }
 
-  async function handleResetPassword(userId: string) {
-    if (!confirm('Resetar a senha deste beneficiário? Todas as sessões ativas serão encerradas.')) return;
+  async function confirmResetPassword() {
+    if (!resetTarget) return;
+    setResetBusy(true);
     setResettingPassword(true);
     setResetResult(null);
     try {
-      const result = await api.post(`/auth/reset-password/user/${userId}`, {}) as { tempPassword: string; email: string };
+      const result = await api.post(`/auth/reset-password/user/${resetTarget.id}`, {}) as { tempPassword: string; email: string };
       setResetResult(result);
+      setResetTarget(null);
     } catch {
       alert('Erro ao resetar senha. Verifique se o beneficiário possui login cadastrado.');
     } finally {
       setResettingPassword(false);
+      setResetBusy(false);
     }
   }
 
@@ -791,7 +797,7 @@ export default function BeneficiariosClient({
                     <p className="text-sm text-blue-800 font-medium font-mono mt-0.5">{drawerUser.cpf}</p>
                   </div>
                   <button
-                    onClick={() => handleResetPassword(drawerUser.id)}
+                    onClick={() => setResetTarget(drawerUser)}
                     disabled={resettingPassword}
                     className="text-xs font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1.5 shrink-0"
                   >
@@ -1331,6 +1337,17 @@ export default function BeneficiariosClient({
           </div>
         </div>
       )}
+
+      <ConfirmDeleteDialog
+        open={!!resetTarget}
+        title="Resetar senha do beneficiário"
+        description="Será gerada uma nova senha temporária e todas as sessões ativas serão encerradas."
+        targetLabel={resetTarget?.fullName}
+        confirmButtonLabel="Resetar senha"
+        busy={resetBusy}
+        onConfirm={confirmResetPassword}
+        onClose={() => !resetBusy && setResetTarget(null)}
+      />
     </div>
   );
 }

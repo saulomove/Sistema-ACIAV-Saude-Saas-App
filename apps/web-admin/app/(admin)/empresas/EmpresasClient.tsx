@@ -10,6 +10,7 @@ import {
 import * as XLSX from 'xlsx';
 import Modal from '../../../components/Modal';
 import ExportExcelButton from '../../../components/ExportExcelButton';
+import ConfirmDeleteDialog from '../../../components/ConfirmDeleteDialog';
 import { api } from '../../../lib/api-client';
 
 interface Company {
@@ -182,6 +183,11 @@ export default function EmpresasClient({
   // Copied feedback
   const [copied, setCopied] = useState(false);
 
+  // Confirmações (CONFIRMAR)
+  const [deleteTarget, setDeleteTarget] = useState<Company | null>(null);
+  const [resetTarget, setResetTarget] = useState<Company | null>(null);
+  const [confirmBusy, setConfirmBusy] = useState(false);
+
   const lista = (companies as Company[]).filter(
     (c) =>
       !search ||
@@ -213,17 +219,24 @@ export default function EmpresasClient({
 
   // ── Reset password ────────────────────────────────────────────────────
 
-  async function handleResetPassword(companyId: string) {
-    if (!confirm('Resetar a senha do RH desta empresa? Todas as sessões ativas serão encerradas.')) return;
+  function handleResetPassword(company: Company) {
+    setResetTarget(company);
+  }
+
+  async function confirmResetPassword() {
+    if (!resetTarget) return;
+    setConfirmBusy(true);
     setResettingPassword(true);
     setResetResult(null);
     try {
-      const result = await api.post(`/auth/reset-password/company/${companyId}`, {}) as { tempPassword: string; email: string };
+      const result = await api.post(`/auth/reset-password/company/${resetTarget.id}`, {}) as { tempPassword: string; email: string };
       setResetResult(result);
+      setResetTarget(null);
     } catch {
       alert('Erro ao resetar senha. Verifique se a empresa possui login cadastrado.');
     } finally {
       setResettingPassword(false);
+      setConfirmBusy(false);
     }
   }
 
@@ -324,14 +337,22 @@ export default function EmpresasClient({
     }
   }
 
-  async function handleDelete(c: Company, e: React.MouseEvent) {
+  function handleDelete(c: Company, e: React.MouseEvent) {
     e.stopPropagation();
-    if (!confirm(`Inativar "${c.corporateName}"? Os beneficiários vinculados serão preservados.`)) return;
+    setDeleteTarget(c);
+  }
+
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+    setConfirmBusy(true);
     try {
-      await api.delete(`/companies/${c.id}`);
+      await api.delete(`/companies/${deleteTarget.id}`);
+      setDeleteTarget(null);
       startTransition(() => router.refresh());
     } catch {
       alert('Erro ao inativar empresa.');
+    } finally {
+      setConfirmBusy(false);
     }
   }
 
@@ -644,7 +665,7 @@ export default function EmpresasClient({
                       <p className="text-sm text-blue-800 font-medium mt-0.5">{drawerCompany.adminEmail}</p>
                     </div>
                     <button
-                      onClick={() => handleResetPassword(drawerCompany.id)}
+                      onClick={() => handleResetPassword(drawerCompany)}
                       disabled={resettingPassword}
                       className="text-xs font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1.5 shrink-0"
                     >
@@ -1109,6 +1130,28 @@ export default function EmpresasClient({
           )}
         </div>
       </Modal>
+
+      <ConfirmDeleteDialog
+        open={!!deleteTarget}
+        title="Inativar empresa"
+        description="Ao inativar a empresa, seus dados e beneficiários serão preservados, mas ela não aparecerá em listas ativas. Digite CONFIRMAR para prosseguir."
+        targetLabel={deleteTarget?.corporateName}
+        confirmButtonLabel="Inativar"
+        busy={confirmBusy}
+        onConfirm={confirmDelete}
+        onClose={() => !confirmBusy && setDeleteTarget(null)}
+      />
+
+      <ConfirmDeleteDialog
+        open={!!resetTarget}
+        title="Resetar senha do RH"
+        description="Uma nova senha temporária será gerada e todas as sessões ativas do RH desta empresa serão encerradas. Digite CONFIRMAR para prosseguir."
+        targetLabel={resetTarget?.adminEmail ?? resetTarget?.corporateName}
+        confirmButtonLabel="Resetar senha"
+        busy={confirmBusy}
+        onConfirm={confirmResetPassword}
+        onClose={() => !confirmBusy && setResetTarget(null)}
+      />
     </div>
   );
 }

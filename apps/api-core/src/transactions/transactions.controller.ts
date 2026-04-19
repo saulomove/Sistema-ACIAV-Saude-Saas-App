@@ -30,10 +30,17 @@ export class TransactionsController {
     @Query('providerId') providerId: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
   ) {
     // Credenciado só pode ver suas próprias transações
     const effectiveProviderId = req.user.role === 'provider' ? (req.user.providerId ?? providerId) : providerId;
-    return this.transactionsService.findByProvider(effectiveProviderId, Number(page) || 1, Number(limit) || 20);
+    return this.transactionsService.findByProvider(
+      effectiveProviderId,
+      Number(page) || 1,
+      Number(limit) || 20,
+      { startDate, endDate },
+    );
   }
 
   @Get('by-user')

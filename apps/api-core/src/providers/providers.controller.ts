@@ -37,11 +37,43 @@ export class ProvidersController {
     @Query('unitId') unitId?: string,
     @Query('category') category?: string,
     @Query('search') search?: string,
+    @Query('city') city?: string,
+    @Query('sortBy') sortBy?: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
     const effectiveUnitId = req.user.role === 'super_admin' ? unitId : (req.user.unitId ?? unitId);
-    return this.providersService.findAll(effectiveUnitId, category, search, Number(page) || 1, Number(limit) || 50);
+    return this.providersService.findAll(effectiveUnitId, category, search, Number(page) || 1, Number(limit) || 50, { city, sortBy });
+  }
+
+  @Get('cities')
+  listCities(@Req() req: any, @Query('unitId') unitId?: string) {
+    const effectiveUnitId = req.user.role === 'super_admin' ? unitId : (req.user.unitId ?? unitId);
+    return this.providersService.listCities(effectiveUnitId ?? '');
+  }
+
+  @Get('categories')
+  listCategories(@Req() req: any, @Query('unitId') unitId?: string) {
+    const effectiveUnitId = req.user.role === 'super_admin' ? unitId : (req.user.unitId ?? unitId);
+    return this.providersService.listCategories(effectiveUnitId ?? '');
+  }
+
+  @Post(':id/click')
+  async trackClick(
+    @Req() req: any,
+    @Param('id') id: string,
+    @Body() body: { channel?: string },
+  ) {
+    const channel = (body?.channel ?? '').toString().slice(0, 20);
+    const allowed = new Set(['whatsapp', 'phone', 'maps', 'email', 'details']);
+    if (!allowed.has(channel)) throw new BadRequestException('channel inválido');
+    await this.providersService.trackClick(id, {
+      userId: req.user.userId ?? null,
+      channel,
+      ip: req.ip ?? null,
+      userAgent: (req.headers?.['user-agent'] as string) ?? null,
+    });
+    return { ok: true };
   }
 
   @Get('ranking')
