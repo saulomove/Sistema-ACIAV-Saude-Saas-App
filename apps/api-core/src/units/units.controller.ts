@@ -39,7 +39,12 @@ export class UnitsController {
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
+  findOne(@Req() req: any, @Param('id') id: string) {
+    const isOwner = req.user?.unitId === id;
+    const isSuperAdmin = req.user?.role === 'super_admin';
+    if (!isOwner && !isSuperAdmin) {
+      throw new ForbiddenException('Acesso negado.');
+    }
     return this.unitsService.findOne(id);
   }
 

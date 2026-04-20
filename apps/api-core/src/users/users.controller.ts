@@ -21,14 +21,21 @@ export class UsersController {
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
-    const effectiveUnitId = req.user.role === 'super_admin' ? unitId : (req.user.unitId ?? unitId);
-    const effectiveCompanyId = req.user.role === 'rh' ? (req.user.companyId ?? companyId) : companyId;
+    const effectiveUnitId = req.user.role === 'super_admin' ? unitId : req.user.unitId;
+    if (!effectiveUnitId && req.user.role !== 'super_admin') {
+      throw new ForbiddenException('Tenant não identificado.');
+    }
+    const effectiveCompanyId = req.user.role === 'rh' ? req.user.companyId : companyId;
+    if (req.user.role === 'rh' && !effectiveCompanyId) {
+      throw new ForbiddenException('Empresa do usuário não identificada.');
+    }
     return this.usersService.findAll(effectiveUnitId, effectiveCompanyId, search, type, Number(page) || 1, Number(limit) || 50);
   }
 
   @Get('validate/:cpf')
   validateUser(@Req() req: any, @Param('cpf') cpf: string, @Query('unitId') unitId: string) {
-    const effectiveUnitId = req.user.role === 'super_admin' ? unitId : (req.user.unitId ?? unitId);
+    const effectiveUnitId = req.user.role === 'super_admin' ? unitId : req.user.unitId;
+    if (!effectiveUnitId) throw new ForbiddenException('Tenant não identificado.');
     return this.usersService.validateUserByCpf(cpf, effectiveUnitId);
   }
 
@@ -104,8 +111,10 @@ export class UsersController {
 
   @Post()
   create(@Req() req: any, @Query('confirmTransfer') confirmTransfer?: string, @Body() body: any = {}) {
+    const unitId = req.user.role === 'super_admin' ? (body.unitId ?? req.user.unitId) : req.user.unitId;
+    if (!unitId) throw new ForbiddenException('Tenant não identificado.');
     const data = {
-      unitId: req.user.unitId ?? body.unitId,
+      unitId,
       companyId: body.companyId || undefined,
       externalCode: body.externalCode?.trim() || undefined,
       fullName: (body.fullName ?? '').trim(),

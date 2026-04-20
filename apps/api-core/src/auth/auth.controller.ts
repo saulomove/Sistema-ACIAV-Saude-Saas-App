@@ -93,7 +93,8 @@ export class AuthController {
     if (!['super_admin', 'admin_unit'].includes(req.user?.role)) {
       throw new ForbiddenException('Acesso restrito a administradores.');
     }
-    return this.authService.resetPasswordByProvider(providerId);
+    const scopedUnitId = req.user.role === 'super_admin' ? undefined : req.user.unitId;
+    return this.authService.resetPasswordByProvider(providerId, scopedUnitId);
   }
 
   @Post('reset-password/company/:companyId')
@@ -104,7 +105,8 @@ export class AuthController {
     if (!['super_admin', 'admin_unit'].includes(req.user?.role)) {
       throw new ForbiddenException('Acesso restrito a administradores.');
     }
-    return this.authService.resetPasswordByCompany(companyId);
+    const scopedUnitId = req.user.role === 'super_admin' ? undefined : req.user.unitId;
+    return this.authService.resetPasswordByCompany(companyId, scopedUnitId);
   }
 
   @Post('reset-password/user/:userId')
@@ -115,7 +117,8 @@ export class AuthController {
     if (!['super_admin', 'admin_unit'].includes(req.user?.role)) {
       throw new ForbiddenException('Acesso restrito a administradores.');
     }
-    return this.authService.resetPasswordByUser(userId);
+    const scopedUnitId = req.user.role === 'super_admin' ? undefined : req.user.unitId;
+    return this.authService.resetPasswordByUser(userId, scopedUnitId);
   }
 
   @Patch('admin-users/:id/status')

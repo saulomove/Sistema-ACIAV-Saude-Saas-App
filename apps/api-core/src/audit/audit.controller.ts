@@ -30,6 +30,9 @@ export class AuditController {
       throw new ForbiddenException('Acesso restrito a administradores.');
     }
     const unitId = req.user.role === 'super_admin' ? unitIdQuery : (req.user.unitId as string | undefined);
+    if (req.user.role === 'admin_unit' && !unitId) {
+      throw new ForbiddenException('Tenant não identificado.');
+    }
     return this.audit.findAll({
       unitId,
       entity,

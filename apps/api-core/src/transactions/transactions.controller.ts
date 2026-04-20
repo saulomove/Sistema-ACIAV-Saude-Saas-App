@@ -33,8 +33,11 @@ export class TransactionsController {
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
   ) {
-    // Credenciado só pode ver suas próprias transações
-    const effectiveProviderId = req.user.role === 'provider' ? (req.user.providerId ?? providerId) : providerId;
+    let effectiveProviderId = providerId;
+    if (req.user.role === 'provider') {
+      if (!req.user.providerId) throw new ForbiddenException('Credenciado não identificado.');
+      effectiveProviderId = req.user.providerId;
+    }
     return this.transactionsService.findByProvider(
       effectiveProviderId,
       Number(page) || 1,
@@ -68,7 +71,8 @@ export class TransactionsController {
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
-    const effectiveUnitId = req.user.role === 'super_admin' ? unitId : (req.user.unitId ?? unitId);
+    const effectiveUnitId = req.user.role === 'super_admin' ? unitId : req.user.unitId;
+    if (!effectiveUnitId) throw new ForbiddenException('Tenant não identificado.');
     return this.transactionsService.findByUnit(effectiveUnitId, Number(page) || 1, Number(limit) || 50);
   }
 }

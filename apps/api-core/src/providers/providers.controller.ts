@@ -58,19 +58,28 @@ export class ProvidersController {
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
-    const effectiveUnitId = req.user.role === 'super_admin' ? unitId : (req.user.unitId ?? unitId);
+    const effectiveUnitId = req.user.role === 'super_admin' ? unitId : req.user.unitId;
+    if (!effectiveUnitId && req.user.role !== 'super_admin') {
+      throw new ForbiddenException('Tenant não identificado.');
+    }
     return this.providersService.findAll(effectiveUnitId, category, search, Number(page) || 1, Number(limit) || 50, { city, sortBy });
   }
 
   @Get('cities')
   listCities(@Req() req: any, @Query('unitId') unitId?: string) {
-    const effectiveUnitId = req.user.role === 'super_admin' ? unitId : (req.user.unitId ?? unitId);
+    const effectiveUnitId = req.user.role === 'super_admin' ? unitId : req.user.unitId;
+    if (!effectiveUnitId && req.user.role !== 'super_admin') {
+      throw new ForbiddenException('Tenant não identificado.');
+    }
     return this.providersService.listCities(effectiveUnitId ?? '');
   }
 
   @Get('categories')
   listCategories(@Req() req: any, @Query('unitId') unitId?: string) {
-    const effectiveUnitId = req.user.role === 'super_admin' ? unitId : (req.user.unitId ?? unitId);
+    const effectiveUnitId = req.user.role === 'super_admin' ? unitId : req.user.unitId;
+    if (!effectiveUnitId && req.user.role !== 'super_admin') {
+      throw new ForbiddenException('Tenant não identificado.');
+    }
     return this.providersService.listCategories(effectiveUnitId ?? '');
   }
 
@@ -143,7 +152,8 @@ export class ProvidersController {
 
   @Get('ranking')
   ranking(@Req() req: any, @Query('unitId') unitId: string, @Query('limit') limit?: string) {
-    const effectiveUnitId = req.user.role === 'super_admin' ? unitId : (req.user.unitId ?? unitId);
+    const effectiveUnitId = req.user.role === 'super_admin' ? unitId : req.user.unitId;
+    if (!effectiveUnitId) throw new ForbiddenException('Tenant não identificado.');
     return this.providersService.ranking(effectiveUnitId, limit ? parseInt(limit) : 5);
   }
 
@@ -155,8 +165,10 @@ export class ProvidersController {
 
   @Post()
   create(@Req() req: any, @Body() body: any) {
+    const unitId = req.user.role === 'super_admin' ? (body.unitId ?? req.user.unitId) : req.user.unitId;
+    if (!unitId) throw new ForbiddenException('Tenant não identificado.');
     const data = {
-      unitId: req.user.unitId ?? body.unitId,
+      unitId,
       name: body.name,
       professionalName: body.professionalName,
       clinicName: body.clinicName,

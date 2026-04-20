@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException, BadRequestException, HttpException, HttpStatus } from '@nestjs/common';
+import { Injectable, UnauthorizedException, BadRequestException, ForbiddenException, HttpException, HttpStatus } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
@@ -289,21 +289,30 @@ export class AuthService {
     return { tempPassword, email: authUser.email };
   }
 
-  async resetPasswordByProvider(providerId: string) {
+  async resetPasswordByProvider(providerId: string, scopedUnitId?: string) {
     const authUser = await this.prisma.authUser.findFirst({ where: { providerId } });
     if (!authUser) throw new BadRequestException('Credenciado não possui login cadastrado.');
+    if (scopedUnitId && authUser.unitId !== scopedUnitId) {
+      throw new ForbiddenException('Credenciado fora do tenant.');
+    }
     return this.resetPassword(authUser.id);
   }
 
-  async resetPasswordByCompany(companyId: string) {
+  async resetPasswordByCompany(companyId: string, scopedUnitId?: string) {
     const authUser = await this.prisma.authUser.findFirst({ where: { companyId } });
     if (!authUser) throw new BadRequestException('Empresa não possui login cadastrado.');
+    if (scopedUnitId && authUser.unitId !== scopedUnitId) {
+      throw new ForbiddenException('Empresa fora do tenant.');
+    }
     return this.resetPassword(authUser.id);
   }
 
-  async resetPasswordByUser(userId: string) {
+  async resetPasswordByUser(userId: string, scopedUnitId?: string) {
     const authUser = await this.prisma.authUser.findFirst({ where: { userId } });
     if (!authUser) throw new BadRequestException('Beneficiário não possui login cadastrado.');
+    if (scopedUnitId && authUser.unitId !== scopedUnitId) {
+      throw new ForbiddenException('Beneficiário fora do tenant.');
+    }
     return this.resetPassword(authUser.id);
   }
 

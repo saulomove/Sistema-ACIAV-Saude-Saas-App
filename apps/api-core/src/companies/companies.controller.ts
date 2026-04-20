@@ -10,13 +10,17 @@ export class CompaniesController {
 
   @Get()
   findAll(@Req() req: any, @Query('unitId') unitId?: string, @Query('search') search?: string) {
-    const effectiveUnitId = req.user.role === 'super_admin' ? unitId : (req.user.unitId ?? unitId);
+    const effectiveUnitId = req.user.role === 'super_admin' ? unitId : req.user.unitId;
+    if (!effectiveUnitId && req.user.role !== 'super_admin') {
+      throw new ForbiddenException('Tenant não identificado.');
+    }
     return this.companiesService.findAll(effectiveUnitId, search);
   }
 
   @Get('stats')
   stats(@Req() req: any, @Query('unitId') unitId: string) {
-    const effectiveUnitId = req.user.role === 'super_admin' ? unitId : (req.user.unitId ?? unitId);
+    const effectiveUnitId = req.user.role === 'super_admin' ? unitId : req.user.unitId;
+    if (!effectiveUnitId) throw new ForbiddenException('Tenant não identificado.');
     return this.companiesService.stats(effectiveUnitId);
   }
 
@@ -31,8 +35,10 @@ export class CompaniesController {
 
   @Post()
   create(@Req() req: any, @Body() body: any) {
+    const unitId = req.user.role === 'super_admin' ? (body.unitId ?? req.user.unitId) : req.user.unitId;
+    if (!unitId) throw new ForbiddenException('Tenant não identificado.');
     const data = {
-      unitId: req.user.unitId ?? body.unitId,
+      unitId,
       externalCode: body.externalCode,
       corporateName: body.corporateName,
       tradeName: body.tradeName,
@@ -54,7 +60,11 @@ export class CompaniesController {
   @Post('import')
   @Throttle({ default: { ttl: 60000, limit: 5 } })
   importBatch(@Req() req: any, @Body() body: { companies: Array<Record<string, string>> }) {
-    const unitId = req.user.unitId ?? body.companies?.[0]?.unitId;
+    if (!['super_admin', 'admin_unit'].includes(req.user?.role)) {
+      throw new ForbiddenException('Acesso restrito a administradores.');
+    }
+    const unitId = req.user.role === 'super_admin' ? (body.companies?.[0]?.unitId ?? req.user.unitId) : req.user.unitId;
+    if (!unitId) throw new ForbiddenException('Tenant não identificado.');
     const companies = (body.companies ?? []).map((c) => ({
       unitId,
       externalCode: c.externalCode,
