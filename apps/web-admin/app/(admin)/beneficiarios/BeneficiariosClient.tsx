@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useTransition, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useTransition, useRef, useEffect } from 'react';
+import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import {
   Users, Plus, Search, Pencil, Trash2, FileSpreadsheet,
   Loader2, X, Phone, Key, Copy, CheckCircle2,
@@ -170,17 +170,39 @@ function mapExcelRow(row: Record<string, unknown>): ImportRow {
 
 export default function BeneficiariosClient({
   users,
+  total,
   companies,
   unitId,
+  initialSearch,
 }: {
   users: unknown[];
+  total: number;
   companies: unknown[];
   unitId: string;
+  initialSearch: string;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
 
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(initialSearch);
+
+  useEffect(() => {
+    const current = (searchParams.get('search') ?? '').trim();
+    const next = search.trim();
+    if (current === next) return;
+    const handle = setTimeout(() => {
+      const params = new URLSearchParams(searchParams.toString());
+      if (next) params.set('search', next);
+      else params.delete('search');
+      const qs = params.toString();
+      startTransition(() => {
+        router.replace(qs ? `${pathname}?${qs}` : pathname);
+      });
+    }, 350);
+    return () => clearTimeout(handle);
+  }, [search, searchParams, pathname, router]);
   const [typeFilter, setTypeFilter] = useState('todos');
   const [statusFilter, setStatusFilter] = useState('ativo');
 
@@ -503,7 +525,10 @@ export default function BeneficiariosClient({
             Gestão de Beneficiários
           </h1>
           <p className="text-slate-500 text-sm mt-1">
-            {userList.length} beneficiários cadastrados — {lista.length} exibidos
+            {total} beneficiários {initialSearch ? `encontrados para "${initialSearch}"` : 'cadastrados'} — {lista.length} exibidos
+            {userList.length < total && !initialSearch && (
+              <span className="ml-2 text-amber-600">(refine a busca para ver além dos primeiros {userList.length})</span>
+            )}
             {isPending && <span className="ml-2 text-primary animate-pulse">atualizando...</span>}
           </p>
         </div>
