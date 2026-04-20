@@ -58,6 +58,55 @@ export class ProvidersController {
     return this.providersService.listCategories(effectiveUnitId ?? '');
   }
 
+  // ─── Self-service do credenciado (role=provider) ───────────────────────────
+
+  private assertProviderSelf(req: any): string {
+    if (req.user.role !== 'provider' || !req.user.providerId) {
+      throw new ForbiddenException('Apenas credenciados podem acessar esta rota.');
+    }
+    return req.user.providerId as string;
+  }
+
+  @Get('me')
+  async findMe(@Req() req: any) {
+    const providerId = this.assertProviderSelf(req);
+    return this.providersService.findOne(providerId);
+  }
+
+  @Put('me')
+  async updateMe(@Req() req: any, @Body() body: any) {
+    const providerId = this.assertProviderSelf(req);
+    const allowed = [
+      'professionalName', 'clinicName', 'registration',
+      'specialty', 'address', 'city', 'phone', 'whatsapp',
+      'email', 'bio', 'businessHours',
+    ];
+    const data: any = {};
+    for (const key of allowed) {
+      if (body[key] !== undefined) data[key] = body[key];
+    }
+    return this.providersService.update(providerId, data);
+  }
+
+  @Post('me/photo')
+  @UseInterceptors(FileInterceptor('file', {
+    storage: uploadStorage,
+    limits: { fileSize: 2 * 1024 * 1024 },
+    fileFilter: (_req, file, cb) => {
+      const allowed = ['.jpg', '.jpeg', '.png', '.webp'];
+      const ext = path.extname(file.originalname).toLowerCase();
+      if (allowed.includes(ext)) cb(null, true);
+      else cb(new BadRequestException('Formato inválido. Use JPG, PNG ou WebP.'), false);
+    },
+  }))
+  async uploadMyPhoto(@Req() req: any, @UploadedFile() file: Express.Multer.File) {
+    const providerId = this.assertProviderSelf(req);
+    if (!file) throw new BadRequestException('Nenhum arquivo enviado.');
+    const photoUrl = `/uploads/providers/${file.filename}`;
+    await this.providersService.update(providerId, { photoUrl });
+    return { photoUrl };
+  }
+
   @Post(':id/click')
   async trackClick(
     @Req() req: any,
@@ -111,7 +160,7 @@ export class ProvidersController {
   @Put(':id')
   async update(@Req() req: any, @Param('id') id: string, @Body() body: any) {
     await this.assertTenant(req, id);
-    const allowed = ['professionalName', 'clinicName', 'registration', 'cpfCnpj', 'category', 'specialty', 'address', 'phone', 'whatsapp', 'email', 'bio', 'photoUrl', 'status'];
+    const allowed = ['professionalName', 'clinicName', 'registration', 'cpfCnpj', 'category', 'specialty', 'address', 'city', 'phone', 'whatsapp', 'email', 'bio', 'businessHours', 'photoUrl', 'status'];
     const data: any = {};
     for (const key of allowed) {
       if (body[key] !== undefined) data[key] = body[key];

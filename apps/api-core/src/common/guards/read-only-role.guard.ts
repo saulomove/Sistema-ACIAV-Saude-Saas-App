@@ -3,9 +3,9 @@ import { CanActivate, ExecutionContext, ForbiddenException, Injectable } from '@
 const WRITE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
 /**
- * Bloqueia qualquer escrita (POST/PUT/PATCH/DELETE) quando o usuário autenticado
- * tem role=provider. O portal do credenciado virou somente leitura — quem registra
- * atendimentos e altera cadastros é o administrador.
+ * Credenciado (role=provider) pode alterar o próprio perfil, senha, foto e horário.
+ * Escritas em serviços (CRUD da tabela de serviços) continuam bloqueadas e só podem
+ * ser feitas pela administração da ACIAV.
  */
 @Injectable()
 export class ReadOnlyProviderGuard implements CanActivate {
@@ -13,6 +13,25 @@ export class ReadOnlyProviderGuard implements CanActivate {
     const req = context.switchToHttp().getRequest();
     if (req.user?.role !== 'provider') return true;
     if (!WRITE_METHODS.has(req.method)) return true;
-    throw new ForbiddenException('Seu portal é apenas para consulta. Para alterações, fale com a administração.');
+
+    const rawUrl: string = req.originalUrl || req.url || '';
+    const path = rawUrl.split('?')[0];
+
+    // Bloqueia qualquer write em rotas de serviços do credenciado.
+    // Ex.: POST /providers/:id/services, PUT /providers/services/:id, DELETE /providers/services/:id
+    if (/\/providers\/(services\/|[^/]+\/services)/i.test(path)) {
+      throw new ForbiddenException(
+        'Alterações em serviços só podem ser feitas pela administração da ACIAV. Solicite pelo WhatsApp.',
+      );
+    }
+
+    // Bloqueia escrita em rewards (brindes/prêmios) — gestão fica com admin.
+    if (/\/providers\/.*\/rewards|\/providers\/rewards\//i.test(path)) {
+      throw new ForbiddenException(
+        'Alterações em prêmios só podem ser feitas pela administração da ACIAV.',
+      );
+    }
+
+    return true;
   }
 }

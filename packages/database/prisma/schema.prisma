@@ -111,6 +111,7 @@ model Provider {
   photoUrl         String?
   rankingScore     Float    @default(0.0)
   bio              String?
+  businessHours    String?  // Horários de atendimento (texto livre)
   status           Boolean  @default(true)
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
