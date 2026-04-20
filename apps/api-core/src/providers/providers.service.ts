@@ -144,6 +144,22 @@ export class ProvidersService {
     });
   }
 
+  async getServiceUnit(serviceId: string): Promise<string | null> {
+    const s = await this.prisma.service.findUnique({
+      where: { id: serviceId },
+      select: { provider: { select: { unitId: true } } },
+    });
+    return s?.provider?.unitId ?? null;
+  }
+
+  async getRewardUnit(rewardId: string): Promise<string | null> {
+    const r = await this.prisma.reward.findUnique({
+      where: { id: rewardId },
+      select: { provider: { select: { unitId: true } } },
+    });
+    return r?.provider?.unitId ?? null;
+  }
+
   async create(data: {
     unitId: string;
     name: string;

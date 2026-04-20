@@ -5,6 +5,11 @@ import { PrismaService } from '../prisma/prisma.service';
 export class StatsService {
   constructor(private prisma: PrismaService) {}
 
+  async getCompanyUnit(companyId: string): Promise<string | null> {
+    const c = await this.prisma.company.findUnique({ where: { id: companyId }, select: { unitId: true } });
+    return c?.unitId ?? null;
+  }
+
   async getDashboardStats(unitId?: string) {
     const unitFilter = unitId ? { unitId } : {};
     const unitUserFilter = unitId ? { user: { unitId } } : {};

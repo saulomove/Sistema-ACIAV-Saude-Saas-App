@@ -31,6 +31,22 @@ export class ProvidersController {
     }
   }
 
+  private async assertServiceTenant(req: any, serviceId: string) {
+    if (req.user.role === 'super_admin') return;
+    const unitId = await this.providersService.getServiceUnit(serviceId);
+    if (!unitId || unitId !== req.user.unitId) {
+      throw new ForbiddenException('Acesso negado.');
+    }
+  }
+
+  private async assertRewardTenant(req: any, rewardId: string) {
+    if (req.user.role === 'super_admin') return;
+    const unitId = await this.providersService.getRewardUnit(rewardId);
+    if (!unitId || unitId !== req.user.unitId) {
+      throw new ForbiddenException('Acesso negado.');
+    }
+  }
+
   @Get()
   findAll(
     @Req() req: any,
@@ -226,7 +242,8 @@ export class ProvidersController {
   }
 
   @Put('services/:serviceId')
-  updateService(@Param('serviceId') serviceId: string, @Body() body: any) {
+  async updateService(@Req() req: any, @Param('serviceId') serviceId: string, @Body() body: any) {
+    await this.assertServiceTenant(req, serviceId);
     const data = {
       description: body.description,
       originalPrice: body.originalPrice,
@@ -241,7 +258,8 @@ export class ProvidersController {
   }
 
   @Delete('services/:serviceId')
-  deleteService(@Param('serviceId') serviceId: string) {
+  async deleteService(@Req() req: any, @Param('serviceId') serviceId: string) {
+    await this.assertServiceTenant(req, serviceId);
     return this.providersService.deleteService(serviceId);
   }
 
@@ -249,8 +267,9 @@ export class ProvidersController {
 
   @Get('rewards/by-unit')
   getRewardsByUnit(@Req() req: any, @Query('unitId') unitId?: string) {
-    const effectiveUnitId = req.user.role === 'super_admin' ? unitId : (req.user.unitId ?? unitId);
-    return this.providersService.getRewardsByUnit(effectiveUnitId ?? '');
+    const effectiveUnitId = req.user.role === 'super_admin' ? unitId : req.user.unitId;
+    if (!effectiveUnitId) throw new ForbiddenException('Tenant não identificado.');
+    return this.providersService.getRewardsByUnit(effectiveUnitId);
   }
 
   @Get(':id/rewards')
@@ -266,12 +285,14 @@ export class ProvidersController {
   }
 
   @Put('rewards/:rewardId')
-  updateReward(@Param('rewardId') rewardId: string, @Body() body: any) {
+  async updateReward(@Req() req: any, @Param('rewardId') rewardId: string, @Body() body: any) {
+    await this.assertRewardTenant(req, rewardId);
     return this.providersService.updateReward(rewardId, body);
   }
 
   @Delete('rewards/:rewardId')
-  deleteReward(@Param('rewardId') rewardId: string) {
+  async deleteReward(@Req() req: any, @Param('rewardId') rewardId: string) {
+    await this.assertRewardTenant(req, rewardId);
     return this.providersService.deleteReward(rewardId);
   }
 }

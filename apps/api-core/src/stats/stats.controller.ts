@@ -1,4 +1,4 @@
-import { Controller, Get, Query, UseGuards, Req, ForbiddenException } from '@nestjs/common';
+import { Controller, Get, Query, UseGuards, Req, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { StatsService } from './stats.service';
 
@@ -9,8 +9,10 @@ export class StatsController {
 
   @Get('dashboard')
   getDashboard(@Req() req: any, @Query('unitId') unitId?: string) {
-    // Não-super_admin só pode ver stats da própria unidade
-    const effectiveUnitId = req.user.role === 'super_admin' ? unitId : (req.user.unitId ?? unitId);
+    const effectiveUnitId = req.user.role === 'super_admin' ? unitId : req.user.unitId;
+    if (!effectiveUnitId && req.user.role !== 'super_admin') {
+      throw new ForbiddenException('Tenant não identificado.');
+    }
     return this.statsService.getDashboardStats(effectiveUnitId);
   }
 
@@ -23,8 +25,26 @@ export class StatsController {
   }
 
   @Get('company')
-  getCompany(@Query('companyId') companyId: string) {
-    return this.statsService.getCompanyStats(companyId);
+  async getCompany(@Req() req: any, @Query('companyId') companyId: string) {
+    if (!companyId) throw new BadRequestException('companyId obrigatório.');
+    const role = req.user?.role;
+    if (role === 'super_admin') {
+      return this.statsService.getCompanyStats(companyId);
+    }
+    if (role === 'rh') {
+      if (req.user.companyId !== companyId) {
+        throw new ForbiddenException('Acesso negado.');
+      }
+      return this.statsService.getCompanyStats(companyId);
+    }
+    if (role === 'admin_unit') {
+      const unitOfCompany = await this.statsService.getCompanyUnit(companyId);
+      if (!unitOfCompany || unitOfCompany !== req.user.unitId) {
+        throw new ForbiddenException('Acesso negado.');
+      }
+      return this.statsService.getCompanyStats(companyId);
+    }
+    throw new ForbiddenException('Acesso negado.');
   }
 
   @Get('billing')
