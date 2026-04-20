@@ -6,9 +6,24 @@ interface Service {
   id: string;
   description: string;
   originalPrice: number;
+  insurancePrice?: number | null;
   discountedPrice: number;
+  discountType?: string | null;
+  discountValue?: number | null;
   discountMinPercent?: number | null;
   discountMaxPercent?: number | null;
+}
+
+type PriceMode = 'fixed' | 'percentFixed' | 'percentRange';
+
+function detectPriceMode(s: Service): PriceMode {
+  const insurance = Number(s.insurancePrice ?? 0);
+  if (insurance > 0) return 'fixed';
+  if (s.discountType === 'percentage' && Number(s.discountValue ?? 0) > 0 && s.discountMinPercent == null && s.discountMaxPercent == null) {
+    return 'percentFixed';
+  }
+  if (s.discountMinPercent != null || s.discountMaxPercent != null) return 'percentRange';
+  return 'fixed';
 }
 
 interface Provider {
@@ -224,25 +239,41 @@ export default function ProviderDetailClient({ provider }: { provider: Provider 
           <div className="divide-y divide-gray-100">
             {services.map((s) => {
               const orig = Number(s.originalPrice);
-              const disc = Number(s.discountedPrice);
-              const maxP = s.discountMaxPercent ?? (orig > 0 ? Math.round(((orig - disc) / orig) * 100) : 0);
-              const minP = s.discountMinPercent ?? maxP;
-              const hasRange = minP !== maxP;
+              const mode = detectPriceMode(s);
+              let priceText = '';
+              let pctText = '';
+              if (mode === 'fixed') {
+                const insurance = Number(s.insurancePrice ?? s.discountedPrice ?? 0);
+                priceText = formatCurrency(insurance);
+                if (orig > 0 && insurance > 0 && insurance < orig) {
+                  const pct = Math.round(((orig - insurance) / orig) * 100);
+                  pctText = `${pct}% OFF`;
+                }
+              } else if (mode === 'percentFixed') {
+                const pct = Math.round(Number(s.discountValue ?? 0));
+                priceText = orig > 0 ? formatCurrency(orig * (1 - pct / 100)) : `${pct}% OFF`;
+                pctText = `${pct}% OFF`;
+              } else {
+                const maxP = s.discountMaxPercent ?? s.discountMinPercent ?? 0;
+                const minP = s.discountMinPercent ?? maxP;
+                if (orig > 0) {
+                  priceText = minP === maxP
+                    ? formatCurrency(orig * (1 - maxP / 100))
+                    : `${formatCurrency(orig * (1 - maxP / 100))} a ${formatCurrency(orig * (1 - minP / 100))}`;
+                }
+                pctText = minP === maxP ? `${maxP}% OFF` : `${minP}% a ${maxP}% OFF`;
+              }
               return (
                 <div key={s.id} className="py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                   <div>
                     <p className="font-bold text-slate-800">{s.description}</p>
-                    <p className="text-xs text-slate-400 mt-0.5 line-through">Particular: {formatCurrency(orig)}</p>
+                    {orig > 0 && (
+                      <p className="text-xs text-slate-400 mt-0.5 line-through">Particular: {formatCurrency(orig)}</p>
+                    )}
                   </div>
                   <div className="text-right">
-                    <p className="text-lg font-black text-[#007178]">
-                      {hasRange
-                        ? `${formatCurrency(orig * (1 - maxP / 100))} a ${formatCurrency(orig * (1 - minP / 100))}`
-                        : formatCurrency(disc > 0 ? disc : orig * (1 - maxP / 100))}
-                    </p>
-                    <p className="text-xs font-bold text-emerald-600 mt-0.5">
-                      {hasRange ? `${minP}% a ${maxP}%` : `${maxP}%`} OFF
-                    </p>
+                    {priceText && <p className="text-lg font-black text-[#007178]">{priceText}</p>}
+                    {pctText && <p className="text-xs font-bold text-emerald-600 mt-0.5">{pctText}</p>}
                   </div>
                 </div>
               );

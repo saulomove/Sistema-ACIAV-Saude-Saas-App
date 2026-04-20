@@ -8,7 +8,10 @@ interface Service {
   id: string;
   description: string;
   originalPrice: number;
+  insurancePrice?: number | null;
   discountedPrice: number;
+  discountType?: string | null;
+  discountValue?: number | null;
   discountMinPercent?: number | null;
   discountMaxPercent?: number | null;
 }
@@ -77,20 +80,41 @@ function whatsLink(raw?: string | null) {
   return d ? `https://wa.me/55${d}` : null;
 }
 
+function servicePercents(s: Service): { min: number; max: number } | null {
+  const orig = Number(s.originalPrice);
+  const insurance = Number(s.insurancePrice ?? 0);
+  if (insurance > 0 && orig > 0) {
+    const pct = Math.round(((orig - insurance) / orig) * 100);
+    return { min: pct, max: pct };
+  }
+  if (s.discountType === 'percentage' && Number(s.discountValue ?? 0) > 0 && s.discountMinPercent == null && s.discountMaxPercent == null) {
+    const pct = Math.round(Number(s.discountValue));
+    return { min: pct, max: pct };
+  }
+  if (s.discountMinPercent != null || s.discountMaxPercent != null) {
+    const max = s.discountMaxPercent ?? s.discountMinPercent ?? 0;
+    const min = s.discountMinPercent ?? max;
+    return { min, max };
+  }
+  if (orig > 0) {
+    const disc = Number(s.discountedPrice);
+    const pct = Math.round(((orig - disc) / orig) * 100);
+    if (pct > 0) return { min: pct, max: pct };
+  }
+  return null;
+}
+
 function bestDiscount(services?: Service[]): { minPct: number; maxPct: number; hasRange: boolean } {
   if (!services || services.length === 0) return { minPct: 0, maxPct: 0, hasRange: false };
   let lowest = Infinity;
   let highest = 0;
   let hasRange = false;
   for (const s of services) {
-    const orig = Number(s.originalPrice);
-    const disc = Number(s.discountedPrice);
-    if (orig <= 0) continue;
-    const maxP = s.discountMaxPercent ?? Math.round(((orig - disc) / orig) * 100);
-    const minP = s.discountMinPercent ?? maxP;
-    if (maxP > 0) hasRange = true;
-    if (minP < lowest) lowest = minP;
-    if (maxP > highest) highest = maxP;
+    const pct = servicePercents(s);
+    if (!pct) continue;
+    if (pct.max > 0) hasRange = true;
+    if (pct.min < lowest) lowest = pct.min;
+    if (pct.max > highest) highest = pct.max;
   }
   if (lowest === Infinity) lowest = 0;
   return { minPct: lowest, maxPct: highest, hasRange };

@@ -17,7 +17,7 @@ interface Provider {
   bio?: string | null;
   photoUrl?: string | null;
   rankingScore: number;
-  services?: Array<{ id: string; description: string; originalPrice: number; discountedPrice: number; discountMinPercent?: number | null; discountMaxPercent?: number | null }>;
+  services?: Array<{ id: string; description: string; originalPrice: number; insurancePrice?: number | null; discountedPrice: number; discountType?: string | null; discountValue?: number | null; discountMinPercent?: number | null; discountMaxPercent?: number | null }>;
   _count: { transactions: number; services: number };
 }
 

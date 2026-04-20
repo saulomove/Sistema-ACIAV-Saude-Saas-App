@@ -18,15 +18,18 @@ function fmtMoney(v: number) {
   return Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
-function discountPct(orig: number, disc: number) {
-  if (!orig || orig === 0) return 0;
-  return Math.round(((orig - disc) / orig) * 100);
-}
-
-function rangeLabel(s: Service): string {
-  const maxPct = s.discountMaxPercent ?? discountPct(Number(s.originalPrice), Number(s.discountedPrice));
-  const minPct = s.discountMinPercent ?? maxPct;
-  return minPct === maxPct ? `${maxPct}%` : `${minPct}% – ${maxPct}%`;
+function priceLabel(s: Service): string {
+  const insurance = Number(s.insurancePrice) || 0;
+  if (insurance > 0) return fmtMoney(insurance);
+  if (s.discountType === 'percentage' && Number(s.discountValue) > 0 && s.discountMinPercent == null && s.discountMaxPercent == null) {
+    return `${Math.round(Number(s.discountValue))}% OFF`;
+  }
+  if (s.discountMinPercent != null || s.discountMaxPercent != null) {
+    const min = s.discountMinPercent ?? 0;
+    const max = s.discountMaxPercent ?? 0;
+    return min === max ? `${max}% OFF` : `${min}% a ${max}% OFF`;
+  }
+  return '—';
 }
 
 function whatsLinkForService(raw: string | null | undefined, s: Service): string | null {
@@ -79,7 +82,7 @@ export default function ServicosClient({
               <tr className="bg-slate-50 border-b border-gray-100 text-xs text-slate-500 uppercase tracking-wide">
                 <th className="text-left px-6 py-3 font-bold">Serviço</th>
                 <th className="text-right px-6 py-3 font-bold">Valor Particular</th>
-                <th className="text-right px-6 py-3 font-bold">Faixa de Desconto</th>
+                <th className="text-right px-6 py-3 font-bold">Valor ACIAV / Desconto</th>
                 <th className="text-right px-6 py-3 font-bold">Solicitar alteração</th>
               </tr>
             </thead>
@@ -94,7 +97,7 @@ export default function ServicosClient({
                     </td>
                     <td className="px-6 py-4 text-right">
                       <span className="bg-emerald-100 text-emerald-700 text-xs font-bold px-2 py-1 rounded-full">
-                        {rangeLabel(s)}
+                        {priceLabel(s)}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-right">

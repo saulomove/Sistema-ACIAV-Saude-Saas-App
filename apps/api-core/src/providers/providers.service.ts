@@ -3,8 +3,8 @@ import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 
-const DISCOUNT_MIN = 5;
-const DISCOUNT_MAX = 20;
+const DISCOUNT_MIN = 0;
+const DISCOUNT_MAX = 100;
 
 function clampInt(v: unknown): number | null {
   if (v === null || v === undefined || v === '') return null;
@@ -274,27 +274,35 @@ export class ProvidersService {
   async createService(providerId: string, data: {
     description: string;
     originalPrice: number;
-    discountMinPercent?: number;
-    discountMaxPercent?: number;
-    insurancePrice?: number;
+    discountMinPercent?: number | null;
+    discountMaxPercent?: number | null;
+    insurancePrice?: number | null;
     discountedPrice?: number;
-    discountType?: string;
-    discountValue?: number;
+    discountType?: string | null;
+    discountValue?: number | null;
   }) {
     const range = normalizeDiscountRange(data.discountMinPercent, data.discountMaxPercent);
     const originalPrice = Number(data.originalPrice) || 0;
-    const discountedPrice = data.discountedPrice !== undefined
+    const insurancePrice = data.insurancePrice != null ? Number(data.insurancePrice) : 0;
+    const fixedPct = data.discountType === 'percentage' && data.discountValue != null ? Number(data.discountValue) : null;
+    const effectiveDiscountedPrice = data.discountedPrice !== undefined
       ? Number(data.discountedPrice)
-      : calcDiscounted(originalPrice, range.max);
+      : insurancePrice > 0
+        ? insurancePrice
+        : fixedPct != null
+          ? calcDiscounted(originalPrice, fixedPct)
+          : range.max != null
+            ? calcDiscounted(originalPrice, range.max)
+            : originalPrice;
     return this.prisma.service.create({
       data: {
         providerId,
         description: data.description,
         originalPrice,
-        insurancePrice: data.insurancePrice ?? 0,
-        discountedPrice,
-        discountType: data.discountType ?? 'percentage',
-        discountValue: data.discountValue ?? range.max ?? 0,
+        insurancePrice,
+        discountedPrice: effectiveDiscountedPrice,
+        discountType: data.discountType ?? '',
+        discountValue: fixedPct ?? 0,
         discountMinPercent: range.min,
         discountMaxPercent: range.max,
       },
@@ -304,36 +312,51 @@ export class ProvidersService {
   async updateService(serviceId: string, data: {
     description?: string;
     originalPrice?: number;
-    discountMinPercent?: number;
-    discountMaxPercent?: number;
-    insurancePrice?: number;
+    discountMinPercent?: number | null;
+    discountMaxPercent?: number | null;
+    insurancePrice?: number | null;
     discountedPrice?: number;
-    discountType?: string;
-    discountValue?: number;
+    discountType?: string | null;
+    discountValue?: number | null;
   }) {
     const allowed: any = {};
     if (data.description !== undefined) allowed.description = data.description;
     if (data.originalPrice !== undefined) allowed.originalPrice = Number(data.originalPrice);
-    if (data.insurancePrice !== undefined) allowed.insurancePrice = data.insurancePrice;
-    if (data.discountType !== undefined) allowed.discountType = data.discountType;
-    if (data.discountValue !== undefined) allowed.discountValue = data.discountValue;
+    if (data.insurancePrice !== undefined) {
+      allowed.insurancePrice = data.insurancePrice == null ? 0 : Number(data.insurancePrice);
+    }
+    if (data.discountType !== undefined) allowed.discountType = data.discountType ?? '';
+    if (data.discountValue !== undefined) {
+      allowed.discountValue = data.discountValue == null ? 0 : Number(data.discountValue);
+    }
 
     const hasRange = data.discountMinPercent !== undefined || data.discountMaxPercent !== undefined;
     if (hasRange) {
-      const current = await this.prisma.service.findUnique({ where: { id: serviceId } });
-      const range = normalizeDiscountRange(
-        data.discountMinPercent ?? current?.discountMinPercent ?? undefined,
-        data.discountMaxPercent ?? current?.discountMaxPercent ?? undefined,
-      );
+      const range = normalizeDiscountRange(data.discountMinPercent, data.discountMaxPercent);
       allowed.discountMinPercent = range.min;
       allowed.discountMaxPercent = range.max;
+    }
+
+    if (data.discountedPrice !== undefined) {
+      allowed.discountedPrice = Number(data.discountedPrice);
+    } else {
+      const current = await this.prisma.service.findUnique({ where: { id: serviceId } });
       const originalPrice = allowed.originalPrice ?? Number(current?.originalPrice ?? 0);
-      if (data.discountedPrice === undefined && range.max != null) {
-        allowed.discountedPrice = calcDiscounted(originalPrice, range.max);
+      const effectiveInsurance = allowed.insurancePrice ?? Number(current?.insurancePrice ?? 0);
+      const effectiveType = allowed.discountType ?? current?.discountType ?? null;
+      const effectiveValue = allowed.discountValue ?? Number(current?.discountValue ?? 0);
+      const effectiveMax = allowed.discountMaxPercent ?? current?.discountMaxPercent ?? null;
+      if (effectiveInsurance > 0) {
+        allowed.discountedPrice = effectiveInsurance;
+      } else if (effectiveType === 'percentage' && effectiveValue > 0) {
+        allowed.discountedPrice = calcDiscounted(originalPrice, effectiveValue);
+      } else if (effectiveMax != null) {
+        allowed.discountedPrice = calcDiscounted(originalPrice, effectiveMax);
+      } else {
+        allowed.discountedPrice = originalPrice;
       }
     }
 
-    if (data.discountedPrice !== undefined) allowed.discountedPrice = Number(data.discountedPrice);
     return this.prisma.service.update({ where: { id: serviceId }, data: allowed });
   }
 

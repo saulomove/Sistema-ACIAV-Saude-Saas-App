@@ -7,7 +7,10 @@ interface Service {
   id: string;
   description: string;
   originalPrice: number;
+  insurancePrice?: number | null;
   discountedPrice: number;
+  discountType?: string | null;
+  discountValue?: number | null;
   discountMinPercent?: number | null;
   discountMaxPercent?: number | null;
 }
