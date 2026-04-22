@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { UserCog, UserPlus, Mail, Shield, KeyRound, Ban, CheckCircle2, Copy } from 'lucide-react';
+import { UserCog, UserPlus, Mail, Shield, KeyRound, Ban, CheckCircle2, Copy, Pencil } from 'lucide-react';
 import ConfirmDeleteDialog from '../../../../components/ConfirmDeleteDialog';
 
 interface AuthUserItem {
@@ -56,6 +56,44 @@ export default function AccessTab({ unitId, currentAuthUserId }: Props) {
   const [statusTarget, setStatusTarget] = useState<AuthUserItem | null>(null);
   const [actionBusy, setActionBusy] = useState(false);
   const [resetResult, setResetResult] = useState<{ email: string; tempPassword: string } | null>(null);
+
+  const [editTarget, setEditTarget] = useState<AuthUserItem | null>(null);
+  const [editForm, setEditForm] = useState({ name: '', email: '' });
+  const [editBusy, setEditBusy] = useState(false);
+
+  function openEdit(u: AuthUserItem) {
+    setEditTarget(u);
+    setEditForm({ name: u.name || '', email: u.email });
+  }
+
+  async function saveEdit() {
+    if (!editTarget) return;
+    if (!editForm.email.trim().includes('@')) {
+      alert('E-mail inválido.');
+      return;
+    }
+    setEditBusy(true);
+    try {
+      const res = await fetch(`/internal/api/auth-users/${editTarget.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          displayName: editForm.name.trim() || null,
+          email: editForm.email.trim().toLowerCase(),
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err?.message || 'Erro ao salvar');
+      }
+      setEditTarget(null);
+      await load();
+    } catch (e) {
+      alert((e as Error).message);
+    } finally {
+      setEditBusy(false);
+    }
+  }
 
   async function load() {
     setLoading(true);
@@ -230,6 +268,13 @@ export default function AccessTab({ unitId, currentAuthUserId }: Props) {
                     </td>
                     <td className="px-4 py-3 text-right space-x-1">
                       <button
+                        onClick={() => openEdit(u)}
+                        className="inline-flex items-center gap-1 text-xs font-bold text-slate-700 hover:bg-slate-100 px-2 py-1 rounded"
+                        title="Editar dados"
+                      >
+                        <Pencil size={14} /> Editar
+                      </button>
+                      <button
                         onClick={() => setResetTarget(u)}
                         disabled={isSelf}
                         className="inline-flex items-center gap-1 text-xs font-bold text-amber-700 hover:bg-amber-50 px-2 py-1 rounded disabled:opacity-40 disabled:cursor-not-allowed"
@@ -348,6 +393,50 @@ export default function AccessTab({ unitId, currentAuthUserId }: Props) {
                 </div>
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Modal Editar */}
+      {editTarget && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl p-6 max-w-md w-full space-y-4">
+            <h3 className="font-bold text-lg text-slate-800 flex items-center gap-2">
+              <Pencil className="text-primary" size={20} /> Editar administrador
+            </h3>
+            <div>
+              <label className="block text-xs font-bold text-slate-600 mb-1">Nome</label>
+              <input
+                type="text"
+                value={editForm.name}
+                onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-600 mb-1">E-mail</label>
+              <input
+                type="email"
+                value={editForm.email}
+                onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+              />
+              {editForm.email.trim().toLowerCase() !== editTarget.email && (
+                <p className="text-xs text-amber-600 mt-1">
+                  Alterar o e-mail vai desconectar as sessões ativas — o usuário precisará logar com o novo e-mail.
+                </p>
+              )}
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <button onClick={() => setEditTarget(null)} className="px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-100 rounded-lg">Cancelar</button>
+              <button
+                onClick={saveEdit}
+                disabled={editBusy}
+                className="bg-primary hover:bg-primary-dark text-white px-4 py-2 rounded-lg text-sm font-bold disabled:opacity-60"
+              >
+                {editBusy ? 'Salvando...' : 'Salvar'}
+              </button>
+            </div>
           </div>
         </div>
       )}

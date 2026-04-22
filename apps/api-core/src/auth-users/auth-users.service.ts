@@ -140,7 +140,7 @@ export class AuthUsersService {
     return { ...created, tempPassword };
   }
 
-  async update(id: string, patch: { role?: string; status?: boolean }, actor: ActorContext) {
+  async update(id: string, patch: { role?: string; status?: boolean; displayName?: string | null; email?: string }, actor: ActorContext) {
     if (!ADMIN_ROLES.includes(actor.role)) {
       throw new ForbiddenException('Acesso restrito a administradores.');
     }
@@ -153,7 +153,8 @@ export class AuthUsersService {
     if (actor.role !== 'super_admin' && target.role === 'super_admin') {
       throw new ForbiddenException('Não é possível alterar um super admin.');
     }
-    if (target.id === actor.authUserId) {
+    const isSelf = target.id === actor.authUserId;
+    if (isSelf && (patch.role !== undefined || patch.status !== undefined)) {
       throw new BadRequestException('Você não pode alterar seu próprio papel ou status.');
     }
 
@@ -181,6 +182,23 @@ export class AuthUsersService {
         await this.prisma.session.deleteMany({ where: { authUserId: target.id } });
       }
     }
+    if (patch.displayName !== undefined) {
+      const name = typeof patch.displayName === 'string' ? patch.displayName.trim() : null;
+      data.displayName = name || null;
+    }
+    if (patch.email !== undefined) {
+      const email = patch.email.trim().toLowerCase();
+      if (!email.includes('@')) {
+        throw new BadRequestException('E-mail inválido.');
+      }
+      if (email !== target.email) {
+        const clash = await this.prisma.authUser.findUnique({ where: { email } });
+        if (clash && clash.id !== target.id) {
+          throw new ConflictException('E-mail já cadastrado no sistema.');
+        }
+        data.email = email;
+      }
+    }
 
     if (Object.keys(data).length === 0) return { ...target };
 
@@ -190,6 +208,10 @@ export class AuthUsersService {
       select: { id: true, email: true, role: true, status: true, displayName: true, unitId: true },
     });
 
+    if (data.email && data.email !== target.email) {
+      await this.prisma.session.deleteMany({ where: { authUserId: target.id } });
+    }
+
     this.audit.log({
       unitId: actor.unitId ?? target.unitId,
       actorAuthUserId: actor.authUserId,
@@ -198,7 +220,7 @@ export class AuthUsersService {
       entity: 'auth_user',
       entityId: target.id,
       action: 'update',
-      diffBefore: { role: target.role, status: target.status },
+      diffBefore: { role: target.role, status: target.status, displayName: target.displayName, email: target.email },
       diffAfter: data,
       ip: actor.ip,
       userAgent: actor.userAgent,

@@ -62,12 +62,14 @@ export class AuthUsersController {
   async update(
     @Req() req: Request & { user?: any },
     @Param('id') id: string,
-    @Body() body: { role?: string; status?: boolean },
+    @Body() body: { role?: string; status?: boolean; displayName?: string | null; email?: string },
   ) {
     const actor = getActorContext(req);
-    const patch: { role?: string; status?: boolean } = {};
+    const patch: { role?: string; status?: boolean; displayName?: string | null; email?: string } = {};
     if (body.role !== undefined) patch.role = body.role;
     if (body.status !== undefined) patch.status = !!body.status;
+    if (body.displayName !== undefined) patch.displayName = body.displayName;
+    if (body.email !== undefined) patch.email = body.email;
     return this.service.update(id, patch, actor);
   }
 
