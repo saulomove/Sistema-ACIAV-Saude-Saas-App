@@ -28,7 +28,11 @@ export class AuthUsersController {
     if (!ADMIN_ROLES.includes(req.user?.role)) throw new ForbiddenException();
     let scopedUnit = unitId;
     if (req.user.role === 'admin_unit') scopedUnit = req.user.unitId;
-    const roles = role ? role.split(',').map((r) => r.trim()).filter(Boolean) : undefined;
+    let roles = role ? role.split(',').map((r) => r.trim()).filter(Boolean) : undefined;
+    if (req.user.role === 'admin_unit') {
+      roles = (roles ?? ['admin_unit']).filter((r) => r !== 'super_admin');
+      if (roles.length === 0) roles = ['admin_unit'];
+    }
     return this.service.list({ unitId: scopedUnit, roles });
   }
 
@@ -36,7 +40,11 @@ export class AuthUsersController {
   async counts(@Req() req: Request & { user?: any }, @Query('unitId') unitId?: string) {
     if (!ADMIN_ROLES.includes(req.user?.role)) throw new ForbiddenException();
     const scoped = req.user.role === 'admin_unit' ? req.user.unitId : unitId;
-    return this.service.counts(scoped ?? '');
+    const result = await this.service.counts(scoped ?? '');
+    if (req.user.role === 'admin_unit') {
+      return { ...result, super_admin: 0 };
+    }
+    return result;
   }
 
   @Post('invite')

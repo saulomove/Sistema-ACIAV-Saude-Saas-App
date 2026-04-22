@@ -150,6 +150,9 @@ export class AuthUsersService {
     if (actor.role === 'admin_unit' && actor.unitId && target.unitId !== actor.unitId) {
       throw new ForbiddenException('Fora da sua unidade.');
     }
+    if (actor.role !== 'super_admin' && target.role === 'super_admin') {
+      throw new ForbiddenException('Não é possível alterar um super admin.');
+    }
     if (target.id === actor.authUserId) {
       throw new BadRequestException('Você não pode alterar seu próprio papel ou status.');
     }
@@ -212,6 +215,9 @@ export class AuthUsersService {
     if (!target) throw new NotFoundException('Usuário não encontrado.');
     if (actor.role === 'admin_unit' && actor.unitId && target.unitId !== actor.unitId) {
       throw new ForbiddenException('Fora da sua unidade.');
+    }
+    if (actor.role !== 'super_admin' && target.role === 'super_admin') {
+      throw new ForbiddenException('Não é possível resetar senha de um super admin.');
     }
 
     const tempPassword = generateTempPassword();

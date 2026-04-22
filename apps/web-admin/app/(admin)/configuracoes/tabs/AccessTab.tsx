@@ -62,7 +62,7 @@ export default function AccessTab({ unitId, currentAuthUserId }: Props) {
     setLoading(true);
     try {
       const [adminsRes, countsRes] = await Promise.all([
-        fetch(`/internal/api/auth-users?unitId=${unitId}&role=admin_unit,super_admin`),
+        fetch(`/internal/api/auth-users?unitId=${unitId}&role=admin_unit`),
         fetch(`/internal/api/auth-users/counts?unitId=${unitId}`),
       ]);
       if (adminsRes.ok) {
@@ -173,8 +173,8 @@ export default function AccessTab({ unitId, currentAuthUserId }: Props) {
         <h3 className="font-bold text-lg text-slate-800 mb-4 flex items-center gap-2">
           <Shield className="text-primary" size={20} /> Usuários por Papel
         </h3>
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-          {(['admin_unit', 'rh', 'provider', 'patient', 'super_admin'] as const).map((r) => (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {(['admin_unit', 'rh', 'provider', 'patient'] as const).map((r) => (
             <div key={r} className="rounded-xl border border-gray-100 bg-slate-50 p-4">
               <div className="text-xs font-bold text-slate-500 uppercase">{ROLE_LABEL[r]}</div>
               <div className="text-2xl font-black text-slate-800 mt-1">{counts[r] ?? 0}</div>
