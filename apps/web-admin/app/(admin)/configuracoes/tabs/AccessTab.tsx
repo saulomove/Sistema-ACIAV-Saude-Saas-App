@@ -36,7 +36,6 @@ const ROLE_LABEL: Record<string, string> = {
 };
 
 const ROLE_MATRIX: Array<{ role: string; panel: string; can: string }> = [
-  { role: 'super_admin', panel: 'Gestão', can: 'Tudo, multi-unidade' },
   { role: 'admin_unit', panel: 'Gestão', can: 'Tudo dentro da unidade' },
   { role: 'rh', panel: 'Portal RH', can: 'Ver e gerenciar empresa, dependentes, inativar' },
   { role: 'provider', panel: 'Portal Credenciado', can: 'Consultar (read-only)' },
