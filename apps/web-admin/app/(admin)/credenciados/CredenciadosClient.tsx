@@ -520,27 +520,30 @@ export default function CredenciadosClient({
 
   async function handleSaveService() {
     if (!serviceForm.description.trim()) { setServiceFormError('Informe a descrição do serviço.'); return; }
-    const orig = parseFloat(serviceForm.originalPrice.replace(',', '.'));
-    if (isNaN(orig) || orig <= 0) { setServiceFormError('Informe um valor particular válido.'); return; }
 
     const mode = serviceForm.priceMode;
     const payload: Record<string, unknown> = {
       description: serviceForm.description,
-      originalPrice: orig,
     };
 
     if (mode === 'fixed') {
+      const orig = parseFloat(serviceForm.originalPrice.replace(',', '.'));
+      if (isNaN(orig) || orig <= 0) { setServiceFormError('Informe um valor particular válido.'); return; }
       const ins = parseFloat(serviceForm.insurancePrice.replace(',', '.'));
       if (isNaN(ins) || ins <= 0) { setServiceFormError('Informe um Valor ACIAV válido.'); return; }
       if (ins > orig) { setServiceFormError('Valor ACIAV não pode ser maior que o Valor Particular.'); return; }
+      payload.originalPrice = orig;
       payload.insurancePrice = ins;
       payload.discountType = null;
       payload.discountValue = null;
       payload.discountMinPercent = null;
       payload.discountMaxPercent = null;
     } else if (mode === 'percentFixed') {
+      const orig = parseFloat(serviceForm.originalPrice.replace(',', '.'));
+      if (isNaN(orig) || orig <= 0) { setServiceFormError('Informe um valor particular válido.'); return; }
       const pct = parseInt(serviceForm.discountPercent, 10);
       if (isNaN(pct) || pct <= 0 || pct > 100) { setServiceFormError('Informe um % de desconto entre 1 e 100.'); return; }
+      payload.originalPrice = orig;
       payload.insurancePrice = null;
       payload.discountType = 'percentage';
       payload.discountValue = pct;
@@ -552,6 +555,7 @@ export default function CredenciadosClient({
       if (isNaN(minPct) || minPct < 0 || minPct > 100) { setServiceFormError('% mínimo deve estar entre 0 e 100.'); return; }
       if (isNaN(maxPct) || maxPct < 0 || maxPct > 100) { setServiceFormError('% máximo deve estar entre 0 e 100.'); return; }
       if (minPct > maxPct) { setServiceFormError('% mínimo não pode ser maior que o máximo.'); return; }
+      payload.originalPrice = 0;
       payload.insurancePrice = null;
       payload.discountType = null;
       payload.discountValue = null;
@@ -1011,12 +1015,16 @@ export default function CredenciadosClient({
                     <div className="space-y-3">
                       {services.map((s) => {
                         const price = formatServicePrice(s);
+                        const itemMode = detectPriceMode(s);
+                        const showOriginal = !(itemMode === 'percentRange' && (!s.originalPrice || Number(s.originalPrice) === 0));
                         return (
                         <div key={s.id} className="bg-slate-50 rounded-xl p-4 flex items-start justify-between gap-3">
                           <div className="flex-1 min-w-0">
                             <p className="font-semibold text-slate-800 text-sm">{s.description}</p>
                             <div className="flex items-center gap-3 mt-2 flex-wrap">
-                              <span className="text-xs text-slate-400">Particular: <span className="font-bold text-slate-600">{fmtMoney(s.originalPrice)}</span></span>
+                              {showOriginal && (
+                                <span className="text-xs text-slate-400">Particular: <span className="font-bold text-slate-600">{fmtMoney(s.originalPrice)}</span></span>
+                              )}
                               <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${price.accent === 'money' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'}`}>
                                 {price.label}: {price.value}
                               </span>
@@ -1077,17 +1085,19 @@ export default function CredenciadosClient({
                   className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-slate-50"
                 />
               </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">Valor Particular (R$)</label>
-                <input
-                  type="number" step="0.01" min="0"
-                  value={serviceForm.originalPrice}
-                  onChange={(e) => setServiceForm((f) => ({ ...f, originalPrice: e.target.value }))}
-                  placeholder="200.00"
-                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-slate-50 text-sm"
-                />
-                <p className="text-xs text-slate-400 mt-1">Valor cheio cobrado aos pacientes sem convênio.</p>
-              </div>
+              {serviceForm.priceMode !== 'percentRange' && (
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5">Valor Particular (R$)</label>
+                  <input
+                    type="number" step="0.01" min="0"
+                    value={serviceForm.originalPrice}
+                    onChange={(e) => setServiceForm((f) => ({ ...f, originalPrice: e.target.value }))}
+                    placeholder="200.00"
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-slate-50 text-sm"
+                  />
+                  <p className="text-xs text-slate-400 mt-1">Valor cheio cobrado aos pacientes sem convênio.</p>
+                </div>
+              )}
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1.5">Modo de precificação</label>
                 <div className="grid grid-cols-3 gap-2">
@@ -1099,7 +1109,11 @@ export default function CredenciadosClient({
                     <button
                       key={opt.value}
                       type="button"
-                      onClick={() => setServiceForm((f) => ({ ...f, priceMode: opt.value }))}
+                      onClick={() => setServiceForm((f) => ({
+                        ...f,
+                        priceMode: opt.value,
+                        originalPrice: opt.value === 'percentRange' ? '' : f.originalPrice,
+                      }))}
                       className={`px-3 py-2 rounded-xl text-xs font-semibold border transition-colors ${
                         serviceForm.priceMode === opt.value
                           ? 'bg-primary text-white border-primary'
