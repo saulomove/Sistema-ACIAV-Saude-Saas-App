@@ -2,12 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 
 const PUBLIC_ROUTES = ['/', '/login', '/esqueci-senha', '/redefinir-senha'];
 
+const PACIENTE_URL = process.env.NEXT_PUBLIC_PACIENTE_URL ?? 'https://app.aciavsaude.com.br';
+
 const ROLE_HOME: Record<string, string> = {
   super_admin: '/dashboard',
   admin_unit: '/dashboard',
   rh: '/portal-rh',
   provider: '/portal-credenciado',
-  patient: '/portal-paciente',
 };
 
 export function middleware(req: NextRequest) {
@@ -36,6 +37,11 @@ export function middleware(req: NextRequest) {
     return NextResponse.redirect(new URL('/login', req.url));
   }
 
+  // Paciente: redirecionar para o app dedicado em qualquer rota
+  if (role === 'patient') {
+    return NextResponse.redirect(`${PACIENTE_URL}/login`);
+  }
+
   // Autenticado tentando acessar /login ou / → redireciona para home do perfil
   if (token && role && (pathname === '/login' || pathname === '/')) {
     const home = ROLE_HOME[role] || '/dashboard';
@@ -46,17 +52,12 @@ export function middleware(req: NextRequest) {
   if (token && role) {
     const home = ROLE_HOME[role] || '/dashboard';
 
-    // Paciente não pode acessar admin
-    if (role === 'patient' && !pathname.startsWith('/portal-paciente')) {
-      return NextResponse.redirect(new URL(home, req.url));
-    }
-
-    // RH não pode acessar admin ou credenciado ou paciente
+    // RH não pode acessar admin ou credenciado
     if (role === 'rh' && !pathname.startsWith('/portal-rh')) {
       return NextResponse.redirect(new URL(home, req.url));
     }
 
-    // Credenciado não pode acessar admin ou rh ou paciente
+    // Credenciado não pode acessar admin ou rh
     if (role === 'provider' && !pathname.startsWith('/portal-credenciado')) {
       return NextResponse.redirect(new URL(home, req.url));
     }

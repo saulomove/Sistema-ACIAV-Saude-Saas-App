@@ -6,12 +6,13 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { CheckCircle2, Eye, EyeOff, Loader2 } from 'lucide-react';
 
+const PACIENTE_URL = process.env.NEXT_PUBLIC_PACIENTE_URL ?? 'https://app.aciavsaude.com.br';
+
 const ROLE_REDIRECT: Record<string, string> = {
   super_admin: '/dashboard',
   admin_unit: '/dashboard',
   rh: '/portal-rh',
   provider: '/portal-credenciado',
-  patient: '/portal-paciente',
 };
 
 export default function LoginPage() {
@@ -46,6 +47,12 @@ export default function LoginPage() {
 
       if (!res.ok) {
         setError(data.message || 'E-mail ou senha incorretos.');
+        return;
+      }
+
+      if (data.user.role === 'patient') {
+        setError('Esta área é exclusiva para administradores. Acesse o app do paciente em ' + PACIENTE_URL.replace(/^https?:\/\//, '') + '.');
+        setTimeout(() => { window.location.href = `${PACIENTE_URL}/login`; }, 2000);
         return;
       }
 
