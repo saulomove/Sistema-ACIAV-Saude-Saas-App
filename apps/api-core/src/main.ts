@@ -18,7 +18,18 @@ async function bootstrap() {
   app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
   app.enableCors({
-    origin: process.env.CORS_ORIGIN?.split(',') ?? ['https://aciavsaude.com.br', 'https://www.aciavsaude.com.br'],
+    origin: process.env.CORS_ORIGIN?.split(',') ?? [
+      'https://aciavsaude.com.br',
+      'https://www.aciavsaude.com.br',
+      'https://app.aciavsaude.com.br',
+      'https://admin.aciavsaude.com.br',
+      'http://localhost:3000',
+      'http://localhost:3001',
+      'http://localhost:3002',
+      'capacitor://localhost',
+      'ionic://localhost',
+      'https://localhost',
+    ],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
     allowedHeaders: ['Content-Type', 'Authorization'],

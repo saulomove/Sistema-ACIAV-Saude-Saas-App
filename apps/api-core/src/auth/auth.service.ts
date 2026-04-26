@@ -65,11 +65,22 @@ export class AuthService {
 
   async login(email: string, password: string) {
     const normalizedEmail = (email || '').trim().toLowerCase();
-    const authUser = await this.prisma.authUser.findUnique({ where: { email: normalizedEmail } });
+    let authUser = await this.prisma.authUser.findUnique({ where: { email: normalizedEmail } });
+
+    // Fallback: identificador é CPF? procurar via User.cpf → AuthUser.userId
+    if (!authUser && normalizedEmail && !normalizedEmail.includes('@')) {
+      const cpf = normalizedEmail.replace(/\D/g, '');
+      if (cpf.length === 11) {
+        const user = await this.prisma.user.findFirst({ where: { cpf }, select: { id: true } });
+        if (user) {
+          authUser = await this.prisma.authUser.findFirst({ where: { userId: user.id } });
+        }
+      }
+    }
 
     if (!authUser || !authUser.status) {
       this.prisma.loginAttempt.create({ data: { email: normalizedEmail, success: false } }).catch(() => undefined);
-      throw new UnauthorizedException('E-mail ou senha incorretos.');
+      throw new UnauthorizedException('Credenciais incorretas.');
     }
 
     const policy = await this.getPolicy(authUser.unitId);
