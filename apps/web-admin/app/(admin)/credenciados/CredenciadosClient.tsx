@@ -35,6 +35,7 @@ interface Provider {
   category: string;
   specialty?: string | null;
   address?: string | null;
+  city?: string | null;
   phone?: string | null;
   whatsapp?: string | null;
   email?: string | null;
@@ -71,9 +72,49 @@ const COLOR_PRESETS: Array<{ value: string; label: string }> = [
 
 const EMPTY_FORM = {
   professionalName: '', clinicName: '', registration: '', cpfCnpj: '',
-  category: '', specialty: '', address: '', phone: '', whatsapp: '',
+  category: '', specialty: '',
+  cep: '', street: '', number: '', neighborhood: '', city: '', state: '',
+  phone: '', whatsapp: '',
   email: '', bio: '',
 };
+
+function formatCep(v: string) {
+  return v.replace(/\D/g, '').slice(0, 8).replace(/^(\d{5})(\d)/, '$1-$2');
+}
+
+function parseAddressData(addr?: string | null) {
+  const empty = { cep: '', street: '', number: '', neighborhood: '', city: '', state: '' };
+  if (!addr) return empty;
+  try {
+    const obj = JSON.parse(addr);
+    if (obj && typeof obj === 'object') {
+      return {
+        cep: String(obj.cep ?? ''),
+        street: String(obj.street ?? ''),
+        number: String(obj.number ?? ''),
+        neighborhood: String(obj.neighborhood ?? ''),
+        city: String(obj.city ?? ''),
+        state: String(obj.state ?? ''),
+      };
+    }
+  } catch {
+    // Endereço antigo em texto livre — coloca no campo street para edição
+    return { ...empty, street: addr };
+  }
+  return empty;
+}
+
+function buildAddressDisplay(addr?: string | null) {
+  const a = parseAddressData(addr);
+  const parts: string[] = [];
+  const streetLine = [a.street, a.number].filter(Boolean).join(', ');
+  if (streetLine) parts.push(streetLine);
+  if (a.neighborhood) parts.push(a.neighborhood);
+  if (a.city) parts.push(a.state ? `${a.city} - ${a.state}` : a.city);
+  if (a.cep) parts.push(`CEP ${formatCep(a.cep)}`);
+  if (!parts.length && addr) return addr;
+  return parts.join(', ');
+}
 
 type PriceMode = 'fixed' | 'percentFixed' | 'percentRange';
 
@@ -392,6 +433,7 @@ export default function CredenciadosClient({
   function openEdit(p: Provider, e?: React.MouseEvent) {
     e?.stopPropagation();
     setEditingId(p.id);
+    const addr = parseAddressData(p.address);
     setForm({
       professionalName: p.professionalName ?? '',
       clinicName: p.clinicName ?? '',
@@ -399,7 +441,12 @@ export default function CredenciadosClient({
       cpfCnpj: p.cpfCnpj ?? '',
       category: p.category,
       specialty: p.specialty ?? '',
-      address: p.address ?? '',
+      cep: addr.cep ? formatCep(addr.cep) : '',
+      street: addr.street,
+      number: addr.number,
+      neighborhood: addr.neighborhood,
+      city: addr.city || (p.city ?? ''),
+      state: addr.state,
       phone: p.phone ?? '',
       whatsapp: p.whatsapp ?? '',
       email: p.email ?? '',
@@ -410,18 +457,48 @@ export default function CredenciadosClient({
     setModalOpen(true);
   }
 
+  async function lookupCep(rawCep: string) {
+    const cep = rawCep.replace(/\D/g, '');
+    if (cep.length !== 8) return;
+    try {
+      const res = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data?.erro) return;
+      setForm((f) => ({
+        ...f,
+        street: data.logradouro || f.street,
+        neighborhood: data.bairro || f.neighborhood,
+        city: data.localidade || f.city,
+        state: data.uf || f.state,
+      }));
+    } catch {
+      // silencioso — usuário preenche manual se viacep falhar
+    }
+  }
+
   async function handleSave() {
     if (!form.professionalName.trim() && !form.clinicName.trim()) {
       setError('Informe o nome do profissional ou da clínica.');
       return;
     }
-    if (!form.email.trim() && !editingId) {
-      setError('E-mail é obrigatório (será o login do credenciado).');
-      return;
-    }
     setSaving(true);
     setError('');
     try {
+      const cleanCep = form.cep.replace(/\D/g, '');
+      const cityClean = form.city.trim();
+      const stateClean = form.state.trim().toUpperCase();
+      const addressParts = {
+        cep: cleanCep,
+        street: form.street.trim(),
+        number: form.number.trim(),
+        neighborhood: form.neighborhood.trim(),
+        city: cityClean,
+        state: stateClean,
+      };
+      const hasAnyAddress = Object.values(addressParts).some(Boolean);
+      const addressJson = hasAnyAddress ? JSON.stringify(addressParts) : undefined;
+
       const payload = {
         unitId,
         name: form.clinicName.trim() || form.professionalName.trim(),
@@ -431,7 +508,8 @@ export default function CredenciadosClient({
         cpfCnpj: form.cpfCnpj.replace(/\D/g, '') || undefined,
         category: form.category,
         specialty: form.specialty.trim() || undefined,
-        address: form.address.trim() || undefined,
+        address: addressJson,
+        city: cityClean || undefined,
         phone: form.phone.replace(/\D/g, '') || undefined,
         whatsapp: form.whatsapp.replace(/\D/g, '') || undefined,
         email: form.email.trim() || undefined,
@@ -860,7 +938,7 @@ export default function CredenciadosClient({
                         <p className="text-xs text-slate-400 font-bold uppercase tracking-wide">Endereço</p>
                         <div className="flex items-start gap-2 text-slate-700 text-sm mt-0.5">
                           <MapPin size={15} className="mt-0.5 text-slate-400 shrink-0" />
-                          {drawerProvider.address}
+                          <span>{buildAddressDisplay(drawerProvider.address)}</span>
                         </div>
                       </div>
                     )}
@@ -1320,14 +1398,79 @@ export default function CredenciadosClient({
                 </div>
 
                 <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-1.5">Endereço completo</label>
-                  <input
-                    type="text"
-                    value={form.address}
-                    onChange={(e) => setForm({ ...form, address: e.target.value })}
-                    className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-slate-50"
-                    placeholder="Rua, número, bairro, cidade - UF"
-                  />
+                  <label className="block text-sm font-bold text-slate-700 mb-1.5">CEP</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={form.cep}
+                      onChange={(e) => setForm({ ...form, cep: formatCep(e.target.value) })}
+                      onBlur={(e) => lookupCep(e.target.value)}
+                      className="w-40 border border-gray-200 rounded-lg px-4 py-2.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-slate-50"
+                      placeholder="00000-000"
+                      maxLength={9}
+                      inputMode="numeric"
+                    />
+                    <p className="text-xs text-slate-400 self-center flex-1">
+                      Digite o CEP e preencheremos rua, bairro, cidade e UF automaticamente.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-[1fr_120px] gap-3">
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1.5">Rua / Logradouro</label>
+                    <input
+                      type="text"
+                      value={form.street}
+                      onChange={(e) => setForm({ ...form, street: e.target.value })}
+                      className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-slate-50"
+                      placeholder="Rua das Flores"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1.5">Número</label>
+                    <input
+                      type="text"
+                      value={form.number}
+                      onChange={(e) => setForm({ ...form, number: e.target.value })}
+                      className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-slate-50"
+                      placeholder="123"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_80px] gap-3">
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1.5">Bairro</label>
+                    <input
+                      type="text"
+                      value={form.neighborhood}
+                      onChange={(e) => setForm({ ...form, neighborhood: e.target.value })}
+                      className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-slate-50"
+                      placeholder="Centro"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1.5">Cidade</label>
+                    <input
+                      type="text"
+                      value={form.city}
+                      onChange={(e) => setForm({ ...form, city: e.target.value })}
+                      className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-slate-50"
+                      placeholder="Videira"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1.5">UF</label>
+                    <input
+                      type="text"
+                      value={form.state}
+                      onChange={(e) => setForm({ ...form, state: e.target.value.toUpperCase().slice(0, 2) })}
+                      className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-slate-50 uppercase"
+                      placeholder="SC"
+                      maxLength={2}
+                    />
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
@@ -1354,8 +1497,10 @@ export default function CredenciadosClient({
                 </div>
 
                 <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-1">E-mail *</label>
-                  <p className="text-xs text-slate-400 mb-1.5">Será usado como login do credenciado na plataforma</p>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">E-mail</label>
+                  <p className="text-xs text-slate-400 mb-1.5">
+                    Opcional. Se preenchido, será usado como login do credenciado na plataforma.
+                  </p>
                   <input
                     type="email"
                     value={form.email}
