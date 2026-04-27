@@ -100,7 +100,7 @@ export default function Sidebar({
       )}
 
     <aside className={clsx(
-      'w-64 bg-white border-r border-gray-100 flex flex-col min-h-screen shadow-sm overflow-hidden z-50',
+      'w-64 bg-white border-r border-gray-100 flex flex-col h-screen shadow-sm overflow-y-auto overflow-x-hidden z-50',
       'fixed inset-y-0 left-0 transition-transform duration-300',
       'md:static md:translate-x-0 md:z-20 md:shrink-0',
       isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
