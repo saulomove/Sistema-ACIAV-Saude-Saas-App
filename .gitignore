@@ -13,3 +13,6 @@ docs/PRD-DEPLOY-*.md
 **/public/sw.js
 **/public/swe-worker-*.js
 **/public/workbox-*.js
+
+# Claude Design handoff extraction (transient)
+.claude-handoff-tmp/
