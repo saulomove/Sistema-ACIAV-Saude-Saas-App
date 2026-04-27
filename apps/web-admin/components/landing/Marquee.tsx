@@ -21,8 +21,10 @@ export default function Marquee() {
 
   return (
     <div
-      className="mt-20 py-6 border-t border-b border-white/10"
-      style={{ background: 'rgba(0,0,0,.1)' }}
+      className="py-6 border-t border-b border-white/10"
+      style={{
+        background: 'linear-gradient(180deg, #0d6b6b 0%, #0a5d5e 100%)',
+      }}
     >
       <div className="max-w-[1200px] mx-auto px-7">
         <div className="text-white/55 text-[11px] uppercase tracking-[0.18em] text-center mb-4 font-semibold">
@@ -33,7 +35,7 @@ export default function Marquee() {
         {items.map((company, i) => (
           <div
             key={`${company}-${i}`}
-            className="text-white/70 font-bold text-[18px] tracking-[-0.01em] flex items-center gap-2.5 shrink-0"
+            className="text-white/85 font-bold text-[18px] tracking-[-0.01em] flex items-center gap-2.5 shrink-0"
           >
             {SHAPES[i % SHAPES.length]}
             <span>{company}</span>
