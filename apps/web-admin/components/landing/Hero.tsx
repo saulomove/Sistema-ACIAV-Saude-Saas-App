@@ -104,7 +104,7 @@ export default function Hero() {
                   {swap}
                 </span>
                 <svg
-                  className="block w-full -mt-2 h-3.5 text-orange-500"
+                  className="absolute left-0 right-0 -bottom-1 sm:-bottom-2 w-full h-2 sm:h-3.5 text-orange-500 pointer-events-none"
                   viewBox="0 0 200 10"
                   preserveAspectRatio="none"
                   fill="none"

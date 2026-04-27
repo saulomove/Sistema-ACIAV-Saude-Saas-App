@@ -84,7 +84,7 @@ export default function Profiles() {
         </div>
 
         {/* Tabs */}
-        <div className="flex flex-wrap justify-center gap-2 p-1.5 bg-white rounded-full mx-auto mb-12 w-fit shadow-md">
+        <div className="flex flex-col sm:flex-row justify-center gap-2 p-1.5 bg-white rounded-3xl sm:rounded-full mx-auto mb-12 w-full sm:w-fit max-w-md sm:max-w-none shadow-md">
           {TABS.map(({ id, label, Icon }) => {
             const isActive = active === id;
             return (
@@ -92,7 +92,7 @@ export default function Profiles() {
                 key={id}
                 type="button"
                 onClick={() => setActive(id)}
-                className={`px-5 py-3 rounded-full font-semibold text-sm inline-flex items-center gap-2 transition-all duration-200 ${
+                className={`w-full sm:w-auto justify-center px-5 py-3 rounded-2xl sm:rounded-full font-semibold text-sm inline-flex items-center gap-2 transition-all duration-200 ${
                   isActive
                     ? 'bg-ink text-white shadow-[0_6px_16px_-6px_rgba(12,30,42,.4)]'
                     : 'bg-transparent text-ink-2 hover:text-teal-800'
@@ -141,9 +141,8 @@ export default function Profiles() {
 
           {/* Visual mock per tab */}
           <div
-            className="relative rounded-[22px] p-7 overflow-hidden text-white"
+            className="relative rounded-[22px] p-5 sm:p-7 overflow-hidden text-white lg:aspect-[4/3.2]"
             style={{
-              aspectRatio: '4 / 3.2',
               background: 'linear-gradient(135deg, #08494a, #14807e)',
               boxShadow: 'var(--shadow-lg)',
             }}
