@@ -69,6 +69,25 @@ function addressLine(addr?: string | null, city?: string | null) {
   return pieces.join(', ');
 }
 
+// Versão sem a cidade — para o card mostrar cidade num badge separado
+function streetLine(addr?: string | null) {
+  const parsed = parseAddress(addr);
+  if (!parsed) return '';
+  const pieces: string[] = [];
+  if (parsed.street) pieces.push(String(parsed.street));
+  if (parsed.number) pieces.push(String(parsed.number));
+  if (parsed.neighborhood) pieces.push(String(parsed.neighborhood));
+  if (!pieces.length && parsed.text) pieces.push(String(parsed.text));
+  return pieces.join(', ');
+}
+
+function cityLabel(addr?: string | null, city?: string | null) {
+  if (city) return city;
+  const parsed = parseAddress(addr);
+  if (parsed?.city) return String(parsed.city);
+  return '';
+}
+
 function mapsLink(addr?: string | null, city?: string | null) {
   const q = addressLine(addr, city);
   if (!q) return '#';
@@ -200,19 +219,21 @@ export default function GuiaClient({ providers, cities, categories, initialCity,
           {providers.map((p) => {
             const disc = bestDiscount(p.services);
             const addrLine = addressLine(p.address, p.city);
+            const street = streetLine(p.address);
+            const city = cityLabel(p.address, p.city);
             const whatsHref = whatsLink(p.whatsapp);
             return (
               <div key={p.id} className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 hover:border-[#007178]/30 transition-all flex flex-col">
-                <div className="flex justify-between items-start mb-4">
+                <div className="flex justify-between items-start mb-4 gap-3">
                   {p.photoUrl ? (
-                    <img src={p.photoUrl} alt="" className="w-14 h-14 rounded-2xl object-cover flex-shrink-0" />
+                    <img src={p.photoUrl} alt="" className="w-20 h-20 rounded-2xl object-cover flex-shrink-0 ring-1 ring-slate-100" />
                   ) : (
-                    <div className="w-14 h-14 bg-[#007178]/10 text-[#007178] rounded-2xl flex items-center justify-center flex-shrink-0">
-                      <Stethoscope size={24} />
+                    <div className="w-20 h-20 bg-[#007178]/10 text-[#007178] rounded-2xl flex items-center justify-center flex-shrink-0">
+                      <Stethoscope size={32} />
                     </div>
                   )}
                   {disc.hasRange && (
-                    <div className="bg-emerald-50 text-emerald-600 px-3 py-1 rounded-full text-xs font-black border border-emerald-100 flex items-center gap-1">
+                    <div className="bg-emerald-50 text-emerald-600 px-3 py-1 rounded-full text-xs font-black border border-emerald-100 flex items-center gap-1 shrink-0">
                       <Percent size={12} />
                       {disc.minPct === disc.maxPct ? `${disc.maxPct}% OFF` : `${disc.minPct}% – ${disc.maxPct}% OFF`}
                     </div>
@@ -233,12 +254,21 @@ export default function GuiaClient({ providers, cities, categories, initialCity,
                   </p>
                 )}
 
-                <div className="space-y-1.5 mt-3">
-                  {addrLine && (
-                    <div className="flex items-center gap-2 text-sm text-slate-500">
-                      <MapPin size={14} className="shrink-0 text-slate-400" />
-                      <span className="line-clamp-1">{addrLine}</span>
-                    </div>
+                {/* Cidade — destaque visual em chip teal */}
+                {city && (
+                  <div className="mt-3 inline-flex items-center gap-1.5 self-start bg-[#007178]/10 text-[#007178] text-xs font-bold px-2.5 py-1 rounded-full">
+                    <MapPin size={12} className="shrink-0" />
+                    {city}
+                  </div>
+                )}
+
+                {/* Endereco (rua + numero + bairro) em linha menor abaixo */}
+                <div className="space-y-1 mt-2">
+                  {street && (
+                    <div className="text-xs text-slate-400 line-clamp-2">{street}</div>
+                  )}
+                  {!street && addrLine && (
+                    <div className="text-xs text-slate-400 line-clamp-2">{addrLine}</div>
                   )}
                   {p.phone && (
                     <div className="flex items-center gap-2 text-sm text-slate-500">
