@@ -7,14 +7,16 @@
   "scripts": {
     "generate": "prisma generate",
     "db:push": "prisma db push",
-    "seed": "tsx prisma/seed.ts"
+    "seed": "tsx prisma/seed.ts",
+    "import:credenciados": "tsx scripts/import-credenciados.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.0.0",
-    "bcrypt": "^5.1.1"
+    "bcrypt": "^5.1.1",
+    "csv-parse": "^5.5.6"
   },
   "devDependencies": {
     "@types/bcrypt": "^5.0.2",

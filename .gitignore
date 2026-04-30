@@ -16,3 +16,6 @@ docs/PRD-DEPLOY-*.md
 
 # Claude Design handoff extraction (transient)
 .claude-handoff-tmp/
+
+# Import scripts: CSV de input com dados sensíveis de credenciados
+**/scripts/.csv-input/
