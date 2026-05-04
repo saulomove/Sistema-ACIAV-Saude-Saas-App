@@ -121,6 +121,10 @@ model Provider {
   transactions  Transaction[]
   rewards       Reward[]
   contactClicks ProviderContactClick[]
+
+  @@index([unitId, status])
+  @@index([unitId, category])
+  @@index([unitId, city])
 }
 
 model Service {

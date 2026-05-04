@@ -10,7 +10,7 @@ import * as path from 'path';
 import * as crypto from 'crypto';
 import * as fs from 'fs/promises';
 import sharp from 'sharp';
-import { ProvidersService } from './providers.service';
+import { ProvidersService, ENTITY_TYPES, type EntityType } from './providers.service';
 
 const PHOTO_MAX_SIZE = 10 * 1024 * 1024; // 10MB
 const PHOTO_OUTPUT_SIZE = 400;
@@ -105,12 +105,26 @@ export class ProvidersController {
     @Query('sortBy') sortBy?: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
+    @Query('type') typeCsv?: string,
+    @Query('discountMin') discountMin?: string,
   ) {
     const effectiveUnitId = req.user.role === 'super_admin' ? unitId : req.user.unitId;
     if (!effectiveUnitId && req.user.role !== 'super_admin') {
       throw new ForbiddenException('Tenant não identificado.');
     }
-    return this.providersService.findAll(effectiveUnitId, category, search, Number(page) || 1, Number(limit) || 50, { city, sortBy });
+    const allowedTypes = new Set<string>(ENTITY_TYPES);
+    const types = typeCsv
+      ? typeCsv.split(',').map((s) => s.trim()).filter((s) => allowedTypes.has(s))
+      : undefined;
+    const discMin = discountMin ? Number(discountMin) : undefined;
+    return this.providersService.findAll(
+      effectiveUnitId,
+      category,
+      search,
+      Number(page) || 1,
+      Number(limit) || 50,
+      { city, sortBy, types: types as EntityType[] | undefined, discountMin: discMin },
+    );
   }
 
   @Get('cities')

@@ -6,6 +6,55 @@ import { PrismaService } from '../prisma/prisma.service';
 const DISCOUNT_MIN = 0;
 const DISCOUNT_MAX = 100;
 
+// ────────────────────────────────────────────────────────────────────────────
+// Tipo derivado de credenciado (não persistido — calculado on-the-fly)
+// ────────────────────────────────────────────────────────────────────────────
+
+export type EntityType =
+  | 'professional'
+  | 'clinic'
+  | 'pharmacy'
+  | 'hospital'
+  | 'lab'
+  | 'store'
+  | 'gym'
+  | 'wellness';
+
+export const ENTITY_TYPES: readonly EntityType[] = [
+  'professional', 'clinic', 'pharmacy', 'hospital', 'lab', 'store', 'gym', 'wellness',
+] as const;
+
+function lowerNoAccent(s: string): string {
+  return s.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '');
+}
+
+/**
+ * Deriva o tipo do credenciado a partir de campos existentes do Provider.
+ * - Se há `professionalName` → 'professional'
+ * - Senão classifica pela `category` em 7 buckets (clinic é o default)
+ */
+export function deriveEntityType(p: { professionalName?: string | null; category: string | null | undefined }): EntityType {
+  if (p.professionalName && p.professionalName.trim()) return 'professional';
+  const c = lowerNoAccent(p.category ?? '');
+  if (c.includes('farmacia')) return 'pharmacy';
+  if (c.includes('hospital')) return 'hospital';
+  if (c.includes('exames laboratoriais') || c.includes('laboratorio')) return 'lab';
+  if (c.includes('otica') || c.includes('produtos naturais') || c.includes('suplementos')) return 'store';
+  if (c.includes('academia')) return 'gym';
+  if (c.includes('estetica') || c.includes('bem-estar') || c === 'bem-estar') return 'wellness';
+  return 'clinic';
+}
+
+function bestDiscountOf(services: { discountMaxPercent?: number | null; originalPrice?: any; discountedPrice?: any }[]): number {
+  return services.reduce((acc, s) => {
+    const pct = s.discountMaxPercent
+      ?? (Number(s.originalPrice) > 0
+        ? Math.round(((Number(s.originalPrice) - Number(s.discountedPrice)) / Number(s.originalPrice)) * 100)
+        : 0);
+    return Math.max(acc, pct);
+  }, 0);
+}
+
 function clampInt(v: unknown): number | null {
   if (v === null || v === undefined || v === '') return null;
   const n = Math.round(Number(v));
@@ -46,10 +95,15 @@ export class ProvidersService {
     search?: string,
     page = 1,
     limit = 50,
-    opts: { city?: string; sortBy?: string } = {},
+    opts: {
+      city?: string;
+      sortBy?: string;
+      types?: EntityType[];
+      discountMin?: number;
+    } = {},
   ) {
     const skip = (page - 1) * limit;
-    const where = {
+    const where: any = {
       ...(unitId && { unitId, status: true }),
       ...(category && { category }),
       ...(opts.city && { city: { equals: opts.city, mode: 'insensitive' as const } }),
@@ -59,47 +113,60 @@ export class ProvidersService {
           { professionalName: { contains: search, mode: 'insensitive' as const } },
           { clinicName: { contains: search, mode: 'insensitive' as const } },
           { specialty: { contains: search, mode: 'insensitive' as const } },
+          { bio: { contains: search, mode: 'insensitive' as const } },
         ],
+      }),
+      ...(opts.discountMin && opts.discountMin > 0 && {
+        services: {
+          some: {
+            OR: [
+              { discountValue: { gte: opts.discountMin } },
+              { discountMaxPercent: { gte: opts.discountMin } },
+            ],
+          },
+        },
       }),
     };
 
-    if (opts.sortBy === 'discount') {
-      const rawData = await this.prisma.provider.findMany({
-        where,
-        include: {
-          _count: { select: { transactions: true, services: true } },
-          services: { select: { id: true, description: true, discountMinPercent: true, discountMaxPercent: true, originalPrice: true, discountedPrice: true } },
-        },
-      });
-      const scored = rawData.map((p) => {
-        const best = p.services.reduce((acc, s) => {
-          const pct = s.discountMaxPercent
-            ?? (Number(s.originalPrice) > 0
-              ? Math.round(((Number(s.originalPrice) - Number(s.discountedPrice)) / Number(s.originalPrice)) * 100)
-              : 0);
-          return Math.max(acc, pct);
-        }, 0);
-        return { ...p, bestDiscount: best };
-      });
-      scored.sort((a, b) => (b.bestDiscount || 0) - (a.bestDiscount || 0) || (b.rankingScore - a.rankingScore));
-      const total = scored.length;
-      const paged = scored.slice(skip, skip + limit);
-      return { data: paged, total, page, limit, totalPages: Math.ceil(total / limit) };
+    // Carrega tudo (vai filtrar `types` em memória — pra ~129 providers ok)
+    const rawData = await this.prisma.provider.findMany({
+      where,
+      include: {
+        _count: { select: { transactions: true, services: true } },
+        services: { select: { id: true, description: true, discountMinPercent: true, discountMaxPercent: true, originalPrice: true, discountedPrice: true } },
+      },
+    });
+
+    // Anota entityType + bestDiscount em cada item
+    let withType = rawData.map((p) => ({
+      ...p,
+      entityType: deriveEntityType(p),
+      bestDiscount: bestDiscountOf(p.services),
+    }));
+
+    // Filtro de tipo (multi)
+    if (opts.types && opts.types.length > 0) {
+      const set = new Set(opts.types);
+      withType = withType.filter((p) => set.has(p.entityType));
     }
 
-    const [data, total] = await Promise.all([
-      this.prisma.provider.findMany({
-        where,
-        include: {
-          _count: { select: { transactions: true, services: true } },
-          services: { select: { id: true, description: true, discountMinPercent: true, discountMaxPercent: true, originalPrice: true, discountedPrice: true } },
-        },
-        orderBy: { rankingScore: 'desc' },
-        skip,
-        take: limit,
-      }),
-      this.prisma.provider.count({ where }),
-    ]);
+    // Ordenação: PROFISSIONAIS PRIMEIRO sempre, depois sortBy
+    const isProf = (p: { entityType: EntityType }) => (p.entityType === 'professional' ? 0 : 1);
+    withType.sort((a, b) => {
+      const cmp = isProf(a) - isProf(b);
+      if (cmp !== 0) return cmp;
+      if (opts.sortBy === 'discount') {
+        return (b.bestDiscount || 0) - (a.bestDiscount || 0)
+          || (b.rankingScore || 0) - (a.rankingScore || 0);
+      }
+      if (opts.sortBy === 'alphabetical') {
+        return (a.name ?? '').localeCompare(b.name ?? '', 'pt-BR');
+      }
+      return (b.rankingScore || 0) - (a.rankingScore || 0);
+    });
+
+    const total = withType.length;
+    const data = withType.slice(skip, skip + limit);
     return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
   }
 
