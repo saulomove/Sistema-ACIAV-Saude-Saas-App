@@ -5,6 +5,8 @@ import {
   Settings, User, Lock, Clock, MessageCircle,
   Camera, Save, AlertCircle, CheckCircle, Info,
 } from 'lucide-react';
+import ImageCropperModal from '../../../../components/ImageCropperModal';
+import { fileToDataUrl } from '../../../../lib/image-crop';
 
 interface Provider {
   id: string;
@@ -51,6 +53,7 @@ export default function ConfiguracoesClient({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [photoMsg, setPhotoMsg] = useState<Msg>(null);
+  const [cropperSrc, setCropperSrc] = useState<string | null>(null);
 
   // Senha
   const [pwd, setPwd] = useState({ current: '', next: '', confirm: '' });
@@ -65,13 +68,26 @@ export default function ConfiguracoesClient({
   // ─── Foto ──────────────────────────────────────────────────────────────────
   async function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
+    if (fileInputRef.current) fileInputRef.current.value = '';
     if (!file) return;
+    if (file.size > 10 * 1024 * 1024) {
+      setPhotoMsg({ type: 'error', text: 'Imagem muito grande (máximo 10 MB).' });
+      return;
+    }
+    try {
+      const src = await fileToDataUrl(file);
+      setPhotoMsg(null);
+      setCropperSrc(src);
+    } catch {
+      setPhotoMsg({ type: 'error', text: 'Não foi possível ler a imagem.' });
+    }
+  }
+
+  async function handleConfirmCrop(blob: Blob) {
     setUploadingPhoto(true);
     setPhotoMsg(null);
-
     const fd = new FormData();
-    fd.append('file', file);
-
+    fd.append('file', blob, 'photo.webp');
     try {
       const res = await fetch(`${apiBase}/providers/me/photo`, {
         method: 'POST',
@@ -83,12 +99,12 @@ export default function ConfiguracoesClient({
       } else {
         setProvider((p) => ({ ...p, photoUrl: data.photoUrl }));
         setPhotoMsg({ type: 'ok', text: 'Foto atualizada com sucesso.' });
+        setCropperSrc(null);
       }
     } catch {
       setPhotoMsg({ type: 'error', text: 'Erro de rede ao enviar foto.' });
     } finally {
       setUploadingPhoto(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   }
 
@@ -205,12 +221,15 @@ export default function ConfiguracoesClient({
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/jpeg,image/png,image/webp"
+              accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
               onChange={handlePhotoChange}
               disabled={uploadingPhoto}
               className="block text-sm text-slate-600 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-bold file:bg-[#007178] file:text-white hover:file:bg-[#005f66] file:cursor-pointer cursor-pointer"
             />
-            <p className="text-xs text-slate-400 mt-1">JPG, PNG ou WebP. Máximo 2 MB.</p>
+            <p className="text-xs text-slate-400 mt-1">
+              Vamos cortar e otimizar pra <strong>400×400</strong> automaticamente.
+              Aceita JPG, PNG, WebP ou HEIC até 10 MB.
+            </p>
           </div>
         </div>
         {photoMsg && (
@@ -463,6 +482,19 @@ export default function ConfiguracoesClient({
           </div>
         </div>
       </section>
+
+      <ImageCropperModal
+        open={cropperSrc !== null}
+        src={cropperSrc}
+        aspect={1}
+        outputSize={400}
+        format="webp"
+        quality={0.85}
+        title="Foto / Logo"
+        helperText="Arraste e use o zoom para enquadrar. A imagem será salva em 400×400 (WebP)."
+        onClose={() => { if (!uploadingPhoto) setCropperSrc(null); }}
+        onConfirm={handleConfirmCrop}
+      />
     </div>
   );
 }

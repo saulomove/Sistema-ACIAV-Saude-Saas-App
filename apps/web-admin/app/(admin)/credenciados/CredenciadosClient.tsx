@@ -11,7 +11,9 @@ import {
 import Modal from '../../../components/Modal';
 import ExportExcelButton from '../../../components/ExportExcelButton';
 import ConfirmDeleteDialog from '../../../components/ConfirmDeleteDialog';
+import ImageCropperModal from '../../../components/ImageCropperModal';
 import { api } from '../../../lib/api-client';
+import { fileToDataUrl } from '../../../lib/image-crop';
 
 interface Service {
   id: string;
@@ -220,8 +222,9 @@ export default function CredenciadosClient({
   const [serviceToast, setServiceToast] = useState('');
   const [serviceToastType, setServiceToastType] = useState<'ok' | 'err'>('ok');
 
-  // Photo upload
+  // Photo upload + cropper
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [cropperState, setCropperState] = useState<{ src: string; providerId: string } | null>(null);
 
   // Reset password
   const [resettingPassword, setResettingPassword] = useState(false);
@@ -381,11 +384,26 @@ export default function CredenciadosClient({
     setTimeout(() => setCopied(false), 2500);
   }
 
-  async function handleUploadPhoto(providerId: string, file: File) {
+  async function handleSelectPhoto(providerId: string, file: File) {
+    if (file.size > 10 * 1024 * 1024) {
+      alert('Imagem muito grande (máximo 10 MB).');
+      return;
+    }
+    try {
+      const src = await fileToDataUrl(file);
+      setCropperState({ src, providerId });
+    } catch {
+      alert('Não foi possível ler a imagem. Tente outro arquivo.');
+    }
+  }
+
+  async function handleConfirmCrop(blob: Blob) {
+    if (!cropperState) return;
+    const { providerId } = cropperState;
     setUploadingPhoto(true);
     try {
       const formData = new FormData();
-      formData.append('file', file);
+      formData.append('file', blob, 'photo.webp');
       const res = await fetch('/internal/api/providers/' + providerId + '/photo', {
         method: 'POST',
         body: formData,
@@ -395,9 +413,10 @@ export default function CredenciadosClient({
       if (drawerProvider) {
         setDrawerProvider({ ...drawerProvider, photoUrl: data.photoUrl });
       }
+      setCropperState(null);
       startTransition(() => router.refresh());
     } catch {
-      alert('Erro ao enviar foto. Use JPG, PNG ou WebP até 2MB.');
+      alert('Erro ao enviar foto. Tente novamente.');
     } finally {
       setUploadingPhoto(false);
     }
@@ -979,11 +998,11 @@ export default function CredenciadosClient({
                         <label className="block">
                           <input
                             type="file"
-                            accept="image/jpeg,image/png,image/webp"
+                            accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
                             className="hidden"
                             onChange={(e) => {
                               const file = e.target.files?.[0];
-                              if (file) handleUploadPhoto(drawerProvider.id, file);
+                              if (file) handleSelectPhoto(drawerProvider.id, file);
                               e.target.value = '';
                             }}
                           />
@@ -992,7 +1011,10 @@ export default function CredenciadosClient({
                             {uploadingPhoto ? 'Enviando...' : 'Enviar Foto'}
                           </span>
                         </label>
-                        <p className="text-xs text-slate-400">JPG, PNG ou WebP. Tamanho ideal: <strong>400x400px</strong>. Máximo: 2MB.</p>
+                        <p className="text-xs text-slate-400">
+                          Vamos cortar e otimizar pra <strong>400×400</strong> automaticamente.
+                          Aceita JPG, PNG, WebP ou HEIC até 10 MB.
+                        </p>
                       </div>
                     </div>
                   </div>
@@ -1774,6 +1796,19 @@ export default function CredenciadosClient({
         busy={catBusy === catDeleteTarget?.id}
         onConfirm={async () => { if (catDeleteTarget) await handleDeleteCategory(catDeleteTarget.id); }}
         onClose={() => { if (catBusy !== catDeleteTarget?.id) setCatDeleteTarget(null); }}
+      />
+
+      <ImageCropperModal
+        open={!!cropperState}
+        src={cropperState?.src ?? null}
+        aspect={1}
+        outputSize={400}
+        format="webp"
+        quality={0.85}
+        title="Foto do credenciado"
+        helperText="Arraste e use o zoom para enquadrar. A imagem será salva em 400×400 (WebP)."
+        onClose={() => { if (!uploadingPhoto) setCropperState(null); }}
+        onConfirm={handleConfirmCrop}
       />
     </div>
   );

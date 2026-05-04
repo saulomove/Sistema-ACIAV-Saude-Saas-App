@@ -8,15 +8,63 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import * as path from 'path';
 import * as crypto from 'crypto';
+import * as fs from 'fs/promises';
+import sharp from 'sharp';
 import { ProvidersService } from './providers.service';
 
+const PHOTO_MAX_SIZE = 10 * 1024 * 1024; // 10MB
+const PHOTO_OUTPUT_SIZE = 400;
+const PHOTO_QUALITY = 85;
+const PROVIDERS_UPLOAD_DIR = path.join(process.cwd(), 'uploads', 'providers');
+
 const uploadStorage = diskStorage({
-  destination: path.join(process.cwd(), 'uploads', 'providers'),
+  destination: PROVIDERS_UPLOAD_DIR,
   filename: (_req, file, cb) => {
     const ext = path.extname(file.originalname).toLowerCase();
-    cb(null, `${crypto.randomBytes(16).toString('hex')}${ext}`);
+    cb(null, `${crypto.randomBytes(16).toString('hex')}${ext || '.bin'}`);
   },
 });
+
+const photoFileFilter = (_req: any, file: Express.Multer.File, cb: any) => {
+  const allowed = ['.jpg', '.jpeg', '.png', '.webp', '.heic', '.heif'];
+  const ext = path.extname(file.originalname).toLowerCase();
+  if (allowed.includes(ext)) cb(null, true);
+  else cb(new BadRequestException('Formato inválido. Use JPG, PNG, WebP ou HEIC.'), false);
+};
+
+/**
+ * Recebe o arquivo cru salvo pelo multer, roda pelo sharp para padronizar
+ * 400x400 cover + WebP q=85, deleta o arquivo intermediário e retorna a URL
+ * relativa final.
+ */
+async function processUploadedPhoto(file: Express.Multer.File): Promise<string> {
+  const inputPath = file.path;
+  const filename = `${crypto.randomBytes(16).toString('hex')}.webp`;
+  const outputPath = path.join(PROVIDERS_UPLOAD_DIR, filename);
+  try {
+    await sharp(inputPath)
+      .rotate() // respeita EXIF
+      .resize(PHOTO_OUTPUT_SIZE, PHOTO_OUTPUT_SIZE, { fit: 'cover' })
+      .webp({ quality: PHOTO_QUALITY })
+      .toFile(outputPath);
+  } catch (err) {
+    await fs.unlink(inputPath).catch(() => undefined);
+    throw new BadRequestException('Não foi possível processar a imagem. Tente outro arquivo.');
+  }
+  await fs.unlink(inputPath).catch(() => undefined);
+  return `/uploads/providers/${filename}`;
+}
+
+/**
+ * Apaga foto antiga em disco (best-effort). Não bloqueia se falhar.
+ */
+async function deleteOldPhotoFile(photoUrl: string | null | undefined): Promise<void> {
+  if (!photoUrl || !photoUrl.startsWith('/uploads/providers/')) return;
+  const filename = path.basename(photoUrl);
+  if (!filename || filename.includes('..') || filename.includes('/')) return;
+  const fullPath = path.join(PROVIDERS_UPLOAD_DIR, filename);
+  await fs.unlink(fullPath).catch(() => undefined);
+}
 
 @Controller('providers')
 @UseGuards(AuthGuard('jwt'))
@@ -116,19 +164,16 @@ export class ProvidersController {
   @Post('me/photo')
   @UseInterceptors(FileInterceptor('file', {
     storage: uploadStorage,
-    limits: { fileSize: 2 * 1024 * 1024 },
-    fileFilter: (_req, file, cb) => {
-      const allowed = ['.jpg', '.jpeg', '.png', '.webp'];
-      const ext = path.extname(file.originalname).toLowerCase();
-      if (allowed.includes(ext)) cb(null, true);
-      else cb(new BadRequestException('Formato inválido. Use JPG, PNG ou WebP.'), false);
-    },
+    limits: { fileSize: PHOTO_MAX_SIZE },
+    fileFilter: photoFileFilter,
   }))
   async uploadMyPhoto(@Req() req: any, @UploadedFile() file: Express.Multer.File) {
     const providerId = this.assertProviderSelf(req);
     if (!file) throw new BadRequestException('Nenhum arquivo enviado.');
-    const photoUrl = `/uploads/providers/${file.filename}`;
+    const previous = await this.providersService.findOne(providerId);
+    const photoUrl = await processUploadedPhoto(file);
     await this.providersService.update(providerId, { photoUrl });
+    await deleteOldPhotoFile(previous?.photoUrl);
     return { photoUrl };
   }
 
@@ -213,19 +258,16 @@ export class ProvidersController {
   @Post(':id/photo')
   @UseInterceptors(FileInterceptor('file', {
     storage: uploadStorage,
-    limits: { fileSize: 2 * 1024 * 1024 }, // 2MB max
-    fileFilter: (_req, file, cb) => {
-      const allowed = ['.jpg', '.jpeg', '.png', '.webp'];
-      const ext = path.extname(file.originalname).toLowerCase();
-      if (allowed.includes(ext)) cb(null, true);
-      else cb(new BadRequestException('Formato inválido. Use JPG, PNG ou WebP.'), false);
-    },
+    limits: { fileSize: PHOTO_MAX_SIZE },
+    fileFilter: photoFileFilter,
   }))
   async uploadPhoto(@Req() req: any, @Param('id') id: string, @UploadedFile() file: Express.Multer.File) {
     await this.assertTenant(req, id);
     if (!file) throw new BadRequestException('Nenhum arquivo enviado.');
-    const photoUrl = `/uploads/providers/${file.filename}`;
+    const previous = await this.providersService.findOne(id);
+    const photoUrl = await processUploadedPhoto(file);
     await this.providersService.update(id, { photoUrl });
+    await deleteOldPhotoFile(previous?.photoUrl);
     return { photoUrl };
   }
 
