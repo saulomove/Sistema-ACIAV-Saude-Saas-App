@@ -4,36 +4,71 @@ const withPWA = require('@ducanh2912/next-pwa').default({
   register: true,
   skipWaiting: true,
   disable: process.env.NODE_ENV === 'development',
-  cacheOnFrontEndNav: true,
-  aggressiveFrontEndNavCaching: true,
+  // IMPORTANTE: NÃO cachear navegações server-rendered.
+  // Páginas com query params dinâmicos (?type=, ?city=, etc) DEVEM ir
+  // direto pro server. Cache do SW só cobre assets estáticos.
+  cacheOnFrontEndNav: false,
+  aggressiveFrontEndNavCaching: false,
   reloadOnOnline: true,
   workboxOptions: {
     disableDevLogs: true,
+    // Não cacheia navegações HTML — Next + server devem responder fresh
+    navigationPreload: false,
     runtimeCaching: [
+      // Imagens enviadas (logos, fotos de credenciados): cache longo
       {
-        urlPattern: /^https?.*/,
-        handler: 'NetworkFirst',
+        urlPattern: /\/uploads\/.*\.(png|jpg|jpeg|webp|gif|svg)(\?.*)?$/i,
+        handler: 'CacheFirst',
         options: {
-          cacheName: 'aciav-runtime',
-          networkTimeoutSeconds: 10,
-          expiration: { maxEntries: 200, maxAgeSeconds: 60 * 60 * 24 },
+          cacheName: 'aciav-uploads',
+          expiration: { maxEntries: 300, maxAgeSeconds: 60 * 60 * 24 * 30 },
         },
       },
+      // Ícones e splash do PWA
       {
-        urlPattern: /\.(?:png|jpg|jpeg|svg|webp|ico)$/,
+        urlPattern: /\/(icons|splash)\/.*\.(png|webp|svg)$/i,
         handler: 'CacheFirst',
+        options: {
+          cacheName: 'aciav-pwa-icons',
+          expiration: { maxEntries: 100, maxAgeSeconds: 60 * 60 * 24 * 365 },
+        },
+      },
+      // Outras imagens estáticas (logo da marca, favicons)
+      {
+        urlPattern: /\.(png|jpg|jpeg|webp|svg|ico)$/i,
+        handler: 'StaleWhileRevalidate',
         options: {
           cacheName: 'aciav-images',
           expiration: { maxEntries: 100, maxAgeSeconds: 60 * 60 * 24 * 30 },
         },
       },
+      // Fontes
       {
-        urlPattern: /\.(?:woff|woff2|ttf)$/,
+        urlPattern: /\.(woff|woff2|ttf)$/i,
         handler: 'CacheFirst',
         options: {
           cacheName: 'aciav-fonts',
           expiration: { maxEntries: 30, maxAgeSeconds: 60 * 60 * 24 * 365 },
         },
+      },
+      // Bundles JS e CSS (compilados pelo Next com hash)
+      {
+        urlPattern: /\/_next\/static\/.*$/,
+        handler: 'CacheFirst',
+        options: {
+          cacheName: 'aciav-next-static',
+          expiration: { maxEntries: 200, maxAgeSeconds: 60 * 60 * 24 * 30 },
+        },
+      },
+      // /internal/api/** SEMPRE direto na rede — nunca cachear chamadas autenticadas
+      {
+        urlPattern: ({ url }) => url.pathname.startsWith('/internal/'),
+        handler: 'NetworkOnly',
+      },
+      // /portal/** (HTML server-rendered) também sempre rede
+      {
+        urlPattern: ({ url, request }) => request.mode === 'navigate' || url.pathname.startsWith('/portal/'),
+        handler: 'NetworkOnly',
       },
     ],
   },
