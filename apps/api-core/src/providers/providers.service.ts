@@ -144,10 +144,26 @@ export class ProvidersService {
       bestDiscount: bestDiscountOf(p.services),
     }));
 
+    // [DEBUG] Distribuição de tipos antes de filtrar
+    const debugLog = process.env.DEBUG_PROVIDERS === '1';
+    if (debugLog) {
+      const typeCounts = withType.reduce((acc, p) => {
+        acc[p.entityType] = (acc[p.entityType] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+      console.log('[providers.findAll] rawData=%d, types-distribution=%j, opts=%j',
+        rawData.length, typeCounts, opts);
+    }
+
     // Filtro de tipo (multi)
     if (opts.types && opts.types.length > 0) {
+      const beforeCount = withType.length;
       const set = new Set(opts.types);
       withType = withType.filter((p) => set.has(p.entityType));
+      if (debugLog) {
+        console.log('[providers.findAll] type filter: %d -> %d (filtros=%j)',
+          beforeCount, withType.length, opts.types);
+      }
     }
 
     // Ordenação: PROFISSIONAIS PRIMEIRO sempre, depois sortBy
