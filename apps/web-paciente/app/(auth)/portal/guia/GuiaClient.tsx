@@ -221,7 +221,11 @@ export default function GuiaClient({
   const activeTypes = useMemo(() => new Set<EntityType>(initialTypes), [initialTypes]);
 
   function toggleType(t: EntityType) {
-    const next = new Set(activeTypes);
+    // Le da URL (atualizada pelo browser imediatamente) em vez de React state,
+    // que pode estar stale entre cliques rapidos antes do re-render do server.
+    const url = new URL(window.location.href);
+    const current = (url.searchParams.get('type') ?? '').split(',').filter(Boolean) as EntityType[];
+    const next = new Set<EntityType>(current);
     if (next.has(t)) next.delete(t);
     else next.add(t);
     setMultiParam('type', Array.from(next));
