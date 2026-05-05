@@ -221,14 +221,18 @@ export default function GuiaClient({
   const activeTypes = useMemo(() => new Set<EntityType>(initialTypes), [initialTypes]);
 
   function toggleType(t: EntityType) {
-    // Le da URL (atualizada pelo browser imediatamente) em vez de React state,
-    // que pode estar stale entre cliques rapidos antes do re-render do server.
     const url = new URL(window.location.href);
     const current = (url.searchParams.get('type') ?? '').split(',').filter(Boolean) as EntityType[];
     const next = new Set<EntityType>(current);
-    if (next.has(t)) next.delete(t);
+    const wasActive = next.has(t);
+    if (wasActive) next.delete(t);
     else next.add(t);
-    setMultiParam('type', Array.from(next));
+    const arr = Array.from(next);
+    // [DEBUG] remover depois de diagnostico
+    console.log('[toggleType]', t, wasActive ? 'DESELECT' : 'SELECT',
+      '| URL.type=', url.searchParams.get('type'),
+      '| current=', current, '| next=', arr);
+    setMultiParam('type', arr);
   }
 
   function toggleDiscount(min: number) {
