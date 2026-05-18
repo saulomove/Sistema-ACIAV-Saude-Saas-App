@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">ACIAV Saúde</string>
+    <string name="title_activity_main">ACIAV Saúde</string>
+    <string name="package_name">br.com.aciavsaude.paciente</string>
+    <string name="custom_url_scheme">br.com.aciavsaude.paciente</string>
+</resources>
