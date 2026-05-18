@@ -4,6 +4,7 @@ import { getSessionUser, serverFetch } from '../../lib/server-api';
 import SidebarPaciente from '../../components/SidebarPaciente';
 import InstallPrompt from '../../components/InstallPrompt';
 import OfflineBanner from '../../components/OfflineBanner';
+import PushBootstrap from '../../components/PushBootstrap';
 import Image from 'next/image';
 
 interface PatientCard {
@@ -71,6 +72,7 @@ export default async function PacienteLayout({ children }: { children: React.Rea
         </main>
       </div>
       <InstallPrompt />
+      <PushBootstrap />
     </div>
   );
 }

@@ -10,15 +10,15 @@ datasource db {
 }
 
 model Unit {
-  id               String   @id @default(uuid())
-  name             String
-  subdomain        String   @unique
-  settings         String?  // JSON string
-  supportWhatsapp  String?
-  featuresRewards  Boolean  @default(false)
-  status           Boolean  @default(true)
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  id              String   @id @default(uuid())
+  name            String
+  subdomain       String   @unique
+  settings        String? // JSON string
+  supportWhatsapp String?
+  featuresRewards Boolean  @default(false)
+  status          Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   companies  Company[]
   users      User[]
@@ -28,27 +28,27 @@ model Unit {
 }
 
 model Company {
-  id                    String    @id @default(uuid())
-  unitId                String
-  externalCode          String?
-  corporateName         String
-  tradeName             String?
-  cnpj                  String    @unique
-  adminEmail            String?
-  address               String?
-  neighborhood          String?
-  zipCode               String?
-  city                  String?
-  state                 String?
-  phone                 String?
-  memberSince           DateTime?
-  dependentPaymentMode  String    @default("titular") // 'titular' | 'empresa'
-  defaultCardType       String    @default("app")     // 'app' | 'physical'
-  status                Boolean   @default(true)
-  inactivationReason    String?
-  inactivatedAt         DateTime?
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
+  id                   String    @id @default(uuid())
+  unitId               String
+  externalCode         String?
+  corporateName        String
+  tradeName            String?
+  cnpj                 String    @unique
+  adminEmail           String?
+  address              String?
+  neighborhood         String?
+  zipCode              String?
+  city                 String?
+  state                String?
+  phone                String?
+  memberSince          DateTime?
+  dependentPaymentMode String    @default("titular") // 'titular' | 'empresa'
+  defaultCardType      String    @default("app") // 'app' | 'physical'
+  status               Boolean   @default(true)
+  inactivationReason   String?
+  inactivatedAt        DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
 
   unit  Unit   @relation(fields: [unitId], references: [id], onDelete: Cascade)
   users User[]
@@ -61,7 +61,7 @@ model User {
   externalCode          String?
   fullName              String
   cpf                   String
-  type                  String    // 'titular' or 'dependente'
+  type                  String // 'titular' or 'dependente'
   parentId              String?
   gender                String?
   birthDate             DateTime?
@@ -75,10 +75,10 @@ model User {
   inactivationReason    String?
   inactivatedAt         DateTime?
   inactivationLockUntil DateTime?
-  cardTypeOverride      String?   // 'app' | 'physical' — null herda da empresa
+  cardTypeOverride      String? // 'app' | 'physical' — null herda da empresa
   pointsBalance         Int       @default(0)
   photoUrl              String?
-  settings              String?   // JSON: { notifications: { email, whatsapp, newProviders } }
+  settings              String? // JSON: { notifications: { email, whatsapp, newProviders } }
   status                Boolean   @default(true)
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
@@ -89,6 +89,7 @@ model User {
   dependents    User[]                 @relation("UserToDependents")
   transactions  Transaction[]
   contactClicks ProviderContactClick[]
+  pushTokens    PushToken[]
 
   @@unique([cpf, unitId])
 }
@@ -99,7 +100,7 @@ model Provider {
   name             String
   professionalName String?
   clinicName       String?
-  registration     String?  // CRM, CREFITO, CRO, etc.
+  registration     String? // CRM, CREFITO, CRO, etc.
   cpfCnpj          String?
   category         String
   specialty        String?
@@ -111,7 +112,7 @@ model Provider {
   photoUrl         String?
   rankingScore     Float    @default(0.0)
   bio              String?
-  businessHours    String?  // Horários de atendimento (texto livre)
+  businessHours    String? // Horários de atendimento (texto livre)
   status           Boolean  @default(true)
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
@@ -174,23 +175,42 @@ model Reward {
 }
 
 model AuthUser {
-  id                     String   @id @default(uuid())
-  email                  String   @unique
+  id                     String    @id @default(uuid())
+  email                  String    @unique
   passwordHash           String
-  role                   String   // 'super_admin' | 'admin_unit' | 'rh' | 'provider' | 'patient'
+  role                   String // 'super_admin' | 'admin_unit' | 'rh' | 'provider' | 'patient'
   unitId                 String?
   companyId              String?
   providerId             String?
   userId                 String?
   displayName            String?
   lastLoginAt            DateTime?
-  passwordChangeRequired Boolean  @default(false)
-  status                 Boolean  @default(true)
-  createdAt              DateTime @default(now())
-  updatedAt              DateTime @updatedAt
+  passwordChangeRequired Boolean   @default(false)
+  status                 Boolean   @default(true)
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
 
   sessions       Session[]
   passwordResets PasswordResetToken[]
+  pushTokens     PushToken[]
+}
+
+model PushToken {
+  id          String   @id @default(uuid())
+  authUserId  String
+  userId      String?
+  platform    String // 'ios' | 'android' | 'web'
+  token       String   @unique
+  deviceLabel String?
+  lastSeenAt  DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  authUser AuthUser @relation(fields: [authUserId], references: [id], onDelete: Cascade)
+  user     User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([authUserId])
+  @@index([userId])
 }
 
 model PasswordResetToken {
@@ -215,7 +235,7 @@ model AuditLog {
   actorRole       String?
   entity          String
   entityId        String?
-  action          String   // create | update | delete | login | reset_password | import | export | status_change | transfer
+  action          String // create | update | delete | login | reset_password | import | export | status_change | transfer
   diffBefore      Json?
   diffAfter       Json?
   ip              String?
@@ -233,7 +253,7 @@ model ProviderContactClick {
   id         String   @id @default(uuid())
   providerId String
   userId     String?
-  channel    String   // whatsapp | phone | maps | details
+  channel    String // whatsapp | phone | maps | details
   ip         String?
   userAgent  String?
   clickedAt  DateTime @default(now())
@@ -287,7 +307,7 @@ model Webhook {
   id        String   @id @default(uuid())
   unitId    String
   url       String
-  events    String   // CSV: "user.created,transaction.created"
+  events    String // CSV: "user.created,transaction.created"
   secret    String
   status    Boolean  @default(true)
   createdAt DateTime @default(now())
@@ -319,7 +339,7 @@ model Category {
   unitId    String
   name      String
   slug      String
-  color     String?  // Ex.: 'bg-blue-50 text-blue-700'
+  color     String? // Ex.: 'bg-blue-50 text-blue-700'
   order     Int      @default(0)
   status    Boolean  @default(true)
   createdAt DateTime @default(now())

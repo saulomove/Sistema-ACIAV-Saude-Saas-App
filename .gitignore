@@ -19,3 +19,32 @@ docs/PRD-DEPLOY-*.md
 
 # Import scripts: CSV de input com dados sensíveis de credenciados
 **/scripts/.csv-input/
+
+# Claude local config (per-machine, never commit)
+.claude/
+logos/
+
+# Firebase config — sensiveis, NAO COMMITAR
+**/google-services.json
+**/GoogleService-Info.plist
+**/firebase-service-account*.json
+**/secrets/
+
+# Android signing keys — NUNCA COMMITAR
+**/android/key.properties
+**/*.keystore
+**/*.jks
+
+# iOS local
+**/ios/App/Pods/
+**/ios/DerivedData/
+**/ios/App/output/
+
+# Android local
+**/android/.gradle/
+**/android/local.properties
+**/android/app/build/
+**/android/build/
+
+# tsconfig build info (cache)
+**/tsconfig.tsbuildinfo

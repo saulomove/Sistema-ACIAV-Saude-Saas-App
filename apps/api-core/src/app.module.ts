@@ -22,6 +22,8 @@ import { AuthUsersModule } from './auth-users/auth-users.module';
 import { BackupModule } from './backup/backup.module';
 import { WebhooksModule } from './webhooks/webhooks.module';
 import { CategoriesModule } from './categories/categories.module';
+import { MobileModule } from './mobile/mobile.module';
+import { PushModule } from './push/push.module';
 import { ReadOnlyProviderGuard } from './common/guards/read-only-role.guard';
 
 @Module({
@@ -45,6 +47,8 @@ import { ReadOnlyProviderGuard } from './common/guards/read-only-role.guard';
     BackupModule,
     WebhooksModule,
     CategoriesModule,
+    MobileModule,
+    PushModule,
   ],
   controllers: [AppController],
   providers: [
