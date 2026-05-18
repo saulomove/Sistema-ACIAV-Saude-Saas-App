@@ -3,7 +3,6 @@ import { getSessionUser, serverFetch } from '../../../lib/server-api';
 import Link from 'next/link';
 import Image from 'next/image';
 import { ArrowRight, MapPin, HeartPulse, ShieldAlert, Star, Sparkles } from 'lucide-react';
-import QrCodeImage from '../../../components/QrCodeImage';
 
 interface PatientCard {
   id: string;
@@ -95,26 +94,21 @@ export default async function PortalPacientePage() {
           </div>
 
           {/* Bottom */}
-          <div className="flex justify-between items-end border-t border-gray-100 pt-5">
-            <div>
-              <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1">Empresa Vinculada</p>
-              <p className="font-bold text-sm text-slate-700">{companyName || '—'}</p>
-              {card && (
-                <p className="text-xs text-slate-400 mt-1 flex items-center gap-1">
-                  <Star size={10} className="text-amber-400 fill-amber-400" />
-                  {card.pointsBalance} pontos acumulados
-                </p>
-              )}
-            </div>
-            <div className="bg-white p-2.5 rounded-2xl shadow-md border border-gray-100">
-              <QrCodeImage value={card?.cpf ?? card?.id ?? 'aciav'} size={64} />
-            </div>
+          <div className="border-t border-gray-100 pt-5">
+            <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1">Empresa Vinculada</p>
+            <p className="font-bold text-sm text-slate-700">{companyName || '—'}</p>
+            {card && (
+              <p className="text-xs text-slate-400 mt-1 flex items-center gap-1">
+                <Star size={10} className="text-amber-400 fill-amber-400" />
+                {card.pointsBalance} pontos acumulados
+              </p>
+            )}
           </div>
         </div>
       </div>
 
       <p className="text-center text-sm font-medium text-slate-400 max-w-sm mx-auto flex items-center justify-center gap-2 bg-slate-50 py-3 px-4 rounded-xl border border-gray-100">
-        <ShieldAlert size={16} className="text-[#007178]" /> Apresente este QR Code no credenciado.
+        <ShieldAlert size={16} className="text-[#007178]" /> Apresente sua carteirinha digital ao credenciado.
       </p>
 
       {/* Quick Actions */}
