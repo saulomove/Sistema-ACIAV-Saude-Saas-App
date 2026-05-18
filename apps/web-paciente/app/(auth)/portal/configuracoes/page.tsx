@@ -212,12 +212,16 @@ export default function ConfiguracoesPage() {
         method: 'DELETE',
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error((data as { message?: string }).message || 'Erro ao solicitar.');
+      if (!res.ok) throw new Error((data as { message?: string }).message || 'Erro ao desativar conta.');
       setDeleteReason('');
       setDeleteConfirm('');
-      setMsg({ kind: 'success', text: 'Solicitação enviada. A administração entrará em contato.' });
+      setMsg({ kind: 'success', text: 'Conta desativada. Você será desconectado em instantes...' });
+      setTimeout(async () => {
+        await fetch('/internal/logout', { method: 'POST' }).catch(() => undefined);
+        window.location.href = '/login';
+      }, 2000);
     } catch (err) {
-      setMsg({ kind: 'error', text: err instanceof Error ? err.message : 'Erro ao solicitar exclusão.' });
+      setMsg({ kind: 'error', text: err instanceof Error ? err.message : 'Erro ao desativar conta.' });
     } finally {
       setDeleting(false);
     }
@@ -503,10 +507,10 @@ export default function ConfiguracoesPage() {
 
               <div className="bg-white p-8 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-rose-100">
                 <h3 className="text-xl font-bold text-rose-700 mb-2 flex items-center gap-2">
-                  <AlertCircle size={20} /> Solicitar exclusão da conta
+                  <AlertCircle size={20} /> Excluir minha conta
                 </h3>
                 <p className="text-sm text-slate-500 mb-4">
-                  Sua solicitação será registrada e encaminhada para a administração. A exclusão definitiva é feita após análise (LGPD — Art. 18, VI). Atendimentos pagos permanecem retidos por obrigação legal.
+                  Sua conta será <strong className="text-rose-700">desativada imediatamente</strong> e você será desconectado. Dados financeiros e de atendimentos pagos permanecem retidos por obrigação legal (LGPD — Art. 16, II). A exclusão definitiva ocorre em até 30 dias — se quiser reativar nesse período, fale com a administração.
                 </p>
                 <div className="space-y-4">
                   <div className="space-y-2">
@@ -538,7 +542,7 @@ export default function ConfiguracoesPage() {
                       className="bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2"
                     >
                       {deleting && <Loader2 size={16} className="animate-spin" />}
-                      Solicitar exclusão
+                      Excluir minha conta
                     </button>
                   </div>
                 </div>

@@ -422,18 +422,46 @@ export class PortalPacienteService {
     });
     if (!user) throw new NotFoundException('Beneficiário não encontrado.');
 
+    // Soft-delete imediato (Apple App Store guideline 5.1.1(v): exclusao deve
+    // ser efetiva in-app, nao apenas registrada para processamento manual).
+    // Mantemos dados financeiros/audit para retencao legal (LGPD Art. 16 II);
+    // hard-delete pode ser feito pela administracao depois.
+    const authUsers = await this.prisma.authUser.findMany({
+      where: { userId },
+      select: { id: true },
+    });
+    const authUserIds = authUsers.map((a) => a.id);
+
+    await this.prisma.$transaction([
+      this.prisma.user.update({
+        where: { id: userId },
+        data: {
+          status: false,
+          inactivatedAt: new Date(),
+          inactivationReason: trimmed,
+        },
+      }),
+      this.prisma.authUser.updateMany({
+        where: { userId },
+        data: { status: false },
+      }),
+      this.prisma.session.deleteMany({
+        where: { authUserId: { in: authUserIds } },
+      }),
+    ]);
+
     this.audit.log({
       unitId: user.unitId,
       actorAuthUserId: actor.authUserId,
       actorRole: 'patient',
       entity: 'User',
       entityId: userId,
-      action: 'delete_request',
-      diffAfter: { reason: trimmed },
+      action: 'account_deletion',
+      diffAfter: { reason: trimmed, softDeleted: true },
       ip: actor.ip ?? null,
       userAgent: actor.userAgent ?? null,
     });
 
-    return { ok: true };
+    return { ok: true, deactivated: true };
   }
 }
