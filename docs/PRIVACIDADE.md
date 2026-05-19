@@ -3,7 +3,7 @@
 > **Versão 1.0** — Vigente a partir de 18 de maio de 2026.
 > **Última atualização:** 18 de maio de 2026.
 
-Esta Política de Privacidade descreve como a **ACIAV — Associação Empresarial de Caçador, Iomerê, Rio das Antas e Macieira** ("ACIAV Saúde", "nós") coleta, usa, armazena, compartilha e protege os dados pessoais dos beneficiários ("você", "titular") do programa **ACIAV Saúde**, em conformidade com a Lei Geral de Proteção de Dados Pessoais (LGPD — Lei nº 13.709/2018), o Regulamento Geral sobre a Proteção de Dados (GDPR — UE 2016/679, quando aplicável) e as diretrizes da Apple App Store e Google Play.
+Esta Política de Privacidade descreve como a **ASSOCIAÇÃO EMPRESARIAL DE VIDEIRA — ACIAV** ("ACIAV Saúde", "nós") coleta, usa, armazena, compartilha e protege os dados pessoais dos beneficiários ("você", "titular") do programa **ACIAV Saúde**, em conformidade com a Lei Geral de Proteção de Dados Pessoais (LGPD — Lei nº 13.709/2018), o Regulamento Geral sobre a Proteção de Dados (GDPR — UE 2016/679, quando aplicável) e as diretrizes da Apple App Store e Google Play.
 
 Ao utilizar o aplicativo móvel **ACIAV Saúde**, o site `aciavsaude.com.br` ou o portal `app.aciavsaude.com.br`, você confirma que leu e concorda com esta Política.
 
@@ -13,11 +13,11 @@ Ao utilizar o aplicativo móvel **ACIAV Saúde**, o site `aciavsaude.com.br` ou 
 
 | Item | Detalhe |
 |---|---|
-| **Razão social** | ACIAV — Associação Empresarial de Caçador, Iomerê, Rio das Antas e Macieira |
-| **CNPJ** | _[a preencher]_ |
-| **Endereço** | _[a preencher — rua, número, cidade, CEP]_ |
-| **E-mail para questões de privacidade (DPO)** | privacidade@aciavsaude.com.br |
-| **Encarregado pelo Tratamento de Dados (DPO)** | _[Nome do encarregado a preencher]_ |
+| **Razão social** | ASSOCIAÇÃO EMPRESARIAL DE VIDEIRA — ACIAV |
+| **CNPJ** | 86.554.672/0001-64 |
+| **Endereço** | Rua XV de Novembro, 19, 2º andar, Centro, Videira/SC, CEP 89.560-130 |
+| **E-mail para questões de privacidade (DPO)** | aciav@aciav.org.br |
+| **Encarregado pelo Tratamento de Dados (DPO)** | Cristiane Corso |
 
 ---
 
@@ -112,7 +112,7 @@ Após esses prazos, os dados são **anonimizados ou excluídos definitivamente**
 
 ## 6. Seus direitos (LGPD Art. 18)
 
-Você pode exercer os direitos abaixo a qualquer momento, **diretamente no app** ou pelo e-mail `privacidade@aciavsaude.com.br`:
+Você pode exercer os direitos abaixo a qualquer momento, **diretamente no app** ou pelo e-mail `aciav@aciav.org.br`:
 
 | Direito | Como exercer |
 |---|---|
@@ -178,7 +178,7 @@ O serviço **ACIAV Saúde** é destinado a adultos maiores de 18 anos (titulares
 
 **Não direcionamos o serviço a menores de 13 anos** e não coletamos dados deles diretamente.
 
-Se você é menor e nos forneceu dados sem autorização do responsável, contate `privacidade@aciavsaude.com.br` para exclusão imediata.
+Se você é menor e nos forneceu dados sem autorização do responsável, contate `aciav@aciav.org.br` para exclusão imediata.
 
 ---
 
@@ -204,16 +204,16 @@ Podemos atualizar esta Política periodicamente para refletir mudanças no servi
 
 | Canal | Endereço |
 |---|---|
-| **E-mail (DPO / Privacidade)** | privacidade@aciavsaude.com.br |
-| **Suporte geral** | _[a preencher]_ |
-| **Endereço físico** | _[a preencher]_ |
-| **Telefone** | _[a preencher]_ |
+| **E-mail (DPO / Privacidade)** | aciav@aciav.org.br |
+| **Suporte geral** | aciav@aciav.org.br |
+| **Endereço físico** | Rua XV de Novembro, 19, 2º andar, Centro, Videira/SC, CEP 89.560-130 |
+| **Telefone** | Disponível mediante solicitação por e-mail |
 
 ---
 
 ## 14. Foro
 
-Para questões relacionadas a esta Política, fica eleito o foro da **Comarca de Caçador / SC**, Brasil, com renúncia a qualquer outro, por mais privilegiado que seja.
+Para questões relacionadas a esta Política, fica eleito o foro da **Comarca de Videira / SC**, Brasil, com renúncia a qualquer outro, por mais privilegiado que seja.
 
 ---
 
