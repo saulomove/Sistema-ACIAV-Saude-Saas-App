@@ -33,7 +33,7 @@ Não importa código entre `apps/*` diretamente — passe pelo `packages/*` ou p
 - **Frontend**: Next.js 16 (App Router, RSC, Turbopack), Tailwind 4, lucide-react, framer-motion.
 - **PWA**: `@ducanh2912/next-pwa` (Workbox). Manifest em `app/manifest.ts`. SW em `/public/sw.js`.
 - **Deploy**: PM2 (3 apps), Nginx reverse proxy, Postgres na VPS, backup automatizado por módulo `backup` no NestJS.
-- **Mobile (em construção)**: Capacitor sobre a PWA web-paciente. Bundle ID: `br.com.aciavsaude.paciente` para Android e iOS.
+- **Mobile (em construção)**: Capacitor sobre a PWA web-paciente. Bundle ID: `br.com.aciavsaude.paciente` para Android e iOS. **Playbook completo de publicação Android + iOS em [docs/PUBLICACAO-MOBILE.md](docs/PUBLICACAO-MOBILE.md)**.
 
 ## Multi-tenancy
 
