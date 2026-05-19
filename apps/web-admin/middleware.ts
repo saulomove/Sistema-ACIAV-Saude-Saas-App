@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const PUBLIC_ROUTES = ['/', '/login', '/esqueci-senha', '/redefinir-senha'];
+const PUBLIC_ROUTES = ['/', '/login', '/esqueci-senha', '/redefinir-senha', '/privacidade'];
 
 const PACIENTE_URL = process.env.NEXT_PUBLIC_PACIENTE_URL ?? 'https://app.aciavsaude.com.br';
 
