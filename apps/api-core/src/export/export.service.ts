@@ -158,6 +158,81 @@ export class ExportService {
     return this.buildWorkbook(rows, 'Credenciados');
   }
 
+  async exportProvidersServices(
+    filters: ExportFilters & { category?: string; city?: string; status?: string },
+  ): Promise<Buffer> {
+    const where: Prisma.ProviderWhereInput = {};
+    if (filters.unitId) where.unitId = filters.unitId;
+    if (filters.category) where.category = filters.category;
+    if (filters.city) where.city = { equals: filters.city, mode: 'insensitive' as const };
+    if (filters.status === 'active') where.status = true;
+    else if (filters.status === 'inactive') where.status = false;
+
+    const providers = await this.prisma.provider.findMany({
+      where,
+      include: { services: true },
+      orderBy: { name: 'asc' },
+    });
+
+    const rows: Record<string, unknown>[] = [];
+
+    for (const p of providers) {
+      const displayName = p.professionalName?.trim() || p.clinicName?.trim() || p.name;
+      const base = {
+        'Nome': displayName,
+        'Categoria': p.category ?? '',
+        'Especialidade': p.specialty ?? '',
+        'Cidade': p.city ?? '',
+        'Status': p.status ? 'Ativo' : 'Inativo',
+      };
+      if (p.services.length === 0) {
+        rows.push({ ...base, 'Serviço': '—', 'Preço Original': '—', 'Preço ACIAV': '—', 'Desconto': '—' });
+      } else {
+        for (const s of p.services) {
+          const orig = Number(s.originalPrice);
+          const disc = Number(s.discountedPrice);
+          rows.push({
+            ...base,
+            'Serviço': s.description,
+            'Preço Original': orig > 0 ? this.formatCurrency(orig) : '—',
+            'Preço ACIAV': disc > 0 ? this.formatCurrency(disc) : '—',
+            'Desconto': this.formatDiscount(s),
+          });
+        }
+      }
+    }
+
+    return this.buildWorkbook(rows, 'Catalogo');
+  }
+
+  private formatCurrency(value: number): string {
+    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+  }
+
+  private formatDiscount(s: {
+    discountMinPercent?: number | null;
+    discountMaxPercent?: number | null;
+    discountType?: string | null;
+    discountValue?: any;
+    originalPrice?: any;
+    discountedPrice?: any;
+  }): string {
+    if (s.discountMinPercent != null || s.discountMaxPercent != null) {
+      const min = s.discountMinPercent ?? s.discountMaxPercent!;
+      const max = s.discountMaxPercent ?? s.discountMinPercent!;
+      return min === max ? `${min}%` : `${min}%–${max}%`;
+    }
+    if (s.discountType === 'percentage' && Number(s.discountValue ?? 0) > 0) {
+      return `${Math.round(Number(s.discountValue))}%`;
+    }
+    const orig = Number(s.originalPrice ?? 0);
+    const disc = Number(s.discountedPrice ?? 0);
+    if (orig > 0 && disc > 0 && disc < orig) {
+      return `${Math.round(((orig - disc) / orig) * 100)}%`;
+    }
+    return '—';
+  }
+
   private buildWorkbook(rows: Record<string, unknown>[], sheetName: string): Buffer {
     const worksheet = XLSX.utils.json_to_sheet(rows);
     const workbook = XLSX.utils.book_new();

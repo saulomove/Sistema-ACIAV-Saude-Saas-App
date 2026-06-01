@@ -117,6 +117,26 @@ export class ExportController {
     this.send(res, buffer, `transacoes-${this.stamp()}.xlsx`);
   }
 
+  @Get('providers-services')
+  async exportProvidersServices(
+    @Req() req: any,
+    @Res() res: Response,
+    @Query('unitId') unitId?: string,
+    @Query('category') category?: string,
+    @Query('city') city?: string,
+    @Query('status') status?: string,
+  ) {
+    this.assertAdmin(req);
+    const scope = this.unitScope(req, unitId);
+    const buffer = await this.exportService.exportProvidersServices({
+      unitId: scope,
+      category,
+      city,
+      status,
+    });
+    this.send(res, buffer, `catalogo-servicos-${this.stamp()}.xlsx`);
+  }
+
   @Get('providers')
   async exportProviders(
     @Req() req: any,

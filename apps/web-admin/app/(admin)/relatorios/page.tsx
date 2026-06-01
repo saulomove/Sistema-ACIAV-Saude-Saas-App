@@ -1,7 +1,8 @@
-import { BarChart3, Users, Building, Stethoscope, Receipt } from 'lucide-react';
+import Link from 'next/link';
+import { BarChart3, Users, Building, Stethoscope, Receipt, ListFilter, ArrowRight } from 'lucide-react';
 import ExportExcelButton from '../../../components/ExportExcelButton';
 
-const cards = [
+const exportCards = [
   {
     title: 'Beneficiários',
     description: 'Lista completa de titulares e dependentes, com empresa, CPF e contato.',
@@ -44,8 +45,29 @@ export default function RelatoriosPage() {
         </p>
       </div>
 
+      {/* Card destaque: Catálogo de Serviços */}
+      <Link
+        href="/relatorios/catalogo-servicos"
+        className="block bg-white rounded-xl border border-teal-100 shadow-sm p-5 hover:border-teal-300 hover:shadow-md transition-all group"
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-start gap-3">
+            <div className="w-11 h-11 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center shrink-0">
+              <ListFilter size={22} />
+            </div>
+            <div>
+              <h2 className="font-bold text-slate-800">Catálogo de Serviços</h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Profissionais, especialidades e tabela de preços. Filtros por cidade, categoria e tipo — visualize na tela, exporte em Excel ou imprima em PDF.
+              </p>
+            </div>
+          </div>
+          <ArrowRight size={18} className="text-teal-500 shrink-0 mt-0.5 group-hover:translate-x-1 transition-transform" />
+        </div>
+      </Link>
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {cards.map((c) => {
+        {exportCards.map((c) => {
           const Icon = c.icon;
           return (
             <div
