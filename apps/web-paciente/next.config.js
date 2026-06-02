@@ -9,9 +9,10 @@ const withPWA = require('@ducanh2912/next-pwa').default({
   // direto pro server. Cache do SW só cobre assets estáticos.
   cacheOnFrontEndNav: false,
   aggressiveFrontEndNavCaching: false,
-  reloadOnOnline: true,
+  reloadOnOnline: false,
   workboxOptions: {
     disableDevLogs: true,
+    clientsClaim: false,
     // Não cacheia navegações HTML — Next + server devem responder fresh
     navigationPreload: false,
     runtimeCaching: [
