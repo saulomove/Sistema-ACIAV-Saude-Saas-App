@@ -149,4 +149,24 @@ export class ExportController {
     });
     this.send(res, buffer, `credenciados-${this.stamp()}.xlsx`);
   }
+
+  @Get('rede-credenciada')
+  async exportRedeCredenciada(
+    @Req() req: any,
+    @Res() res: Response,
+    @Query('unitId') unitId?: string,
+    @Query('city') city?: string,
+    @Query('category') category?: string,
+    @Query('status') status?: string,
+  ) {
+    this.assertAdmin(req);
+    const scope = this.unitScope(req, unitId);
+    const buffer = await this.exportService.exportRedeCredenciada({
+      unitId: scope,
+      city,
+      category,
+      status,
+    });
+    this.send(res, buffer, `rede-credenciada-${this.stamp()}.xlsx`);
+  }
 }

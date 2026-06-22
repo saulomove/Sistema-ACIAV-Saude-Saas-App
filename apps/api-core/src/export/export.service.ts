@@ -158,6 +158,50 @@ export class ExportService {
     return this.buildWorkbook(rows, 'Credenciados');
   }
 
+  async exportRedeCredenciada(
+    filters: ExportFilters & { category?: string; city?: string; status?: string },
+  ): Promise<Buffer> {
+    const where: Prisma.ProviderWhereInput = {};
+    if (filters.unitId) where.unitId = filters.unitId;
+    if (filters.category) where.category = filters.category;
+    if (filters.city) where.city = { equals: filters.city, mode: 'insensitive' as const };
+    if (filters.status === 'inactive') where.status = false;
+    else if (filters.status !== 'all') where.status = true;
+
+    const providers = await this.prisma.provider.findMany({
+      where,
+      orderBy: [{ city: 'asc' }, { name: 'asc' }],
+    });
+
+    const rows = providers.map((p) => ({
+      'Nome': p.professionalName?.trim() || p.clinicName?.trim() || p.name,
+      'Tipo': this.deriveEntityLabel(p),
+      'Especialidade': p.specialty ?? '',
+      'Registro': p.registration ?? '',
+      'Cidade': p.city ?? '',
+      'Endereço': p.address ?? '',
+      'Telefone': p.phone ?? '',
+      'WhatsApp': p.whatsapp ?? '',
+      'Email': p.email ?? '',
+      'Horário de Atendimento': p.businessHours ?? '',
+      'Status': p.status ? 'Ativo' : 'Inativo',
+    }));
+
+    return this.buildWorkbook(rows, 'Rede Credenciada');
+  }
+
+  private deriveEntityLabel(p: { professionalName?: string | null; category?: string | null }): string {
+    if (p.professionalName?.trim()) return 'Profissional';
+    const c = (p.category ?? '').toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '');
+    if (c.includes('farmacia')) return 'Farmácia';
+    if (c.includes('hospital')) return 'Hospital';
+    if (c.includes('exames laboratoriais') || c.includes('laboratorio')) return 'Laboratório';
+    if (c.includes('otica') || c.includes('produtos naturais') || c.includes('suplementos')) return 'Loja';
+    if (c.includes('academia')) return 'Academia';
+    if (c.includes('estetica') || c.includes('bem-estar')) return 'Bem-estar';
+    return 'Clínica';
+  }
+
   async exportProvidersServices(
     filters: ExportFilters & { category?: string; city?: string; status?: string },
   ): Promise<Buffer> {

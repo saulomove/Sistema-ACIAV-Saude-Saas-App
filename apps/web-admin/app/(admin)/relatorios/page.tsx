@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { BarChart3, Users, Building, Stethoscope, Receipt, ListFilter, ArrowRight } from 'lucide-react';
+import { BarChart3, Users, Building, Stethoscope, Receipt, ListFilter, MapPin, ArrowRight } from 'lucide-react';
 import ExportExcelButton from '../../../components/ExportExcelButton';
 
 const exportCards = [
@@ -63,6 +63,27 @@ export default function RelatoriosPage() {
             </div>
           </div>
           <ArrowRight size={18} className="text-teal-500 shrink-0 mt-0.5 group-hover:translate-x-1 transition-transform" />
+        </div>
+      </Link>
+
+      {/* Card destaque: Rede Credenciada */}
+      <Link
+        href="/relatorios/rede-credenciada"
+        className="block bg-white rounded-xl border border-indigo-100 shadow-sm p-5 hover:border-indigo-300 hover:shadow-md transition-all group"
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-start gap-3">
+            <div className="w-11 h-11 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+              <MapPin size={22} />
+            </div>
+            <div>
+              <h2 className="font-bold text-slate-800">Rede Credenciada</h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Diretório completo de credenciados por cidade — contatos, endereços e especialidades. Filtros por cidade, categoria e tipo — visualize na tela, exporte em Excel ou imprima em PDF.
+              </p>
+            </div>
+          </div>
+          <ArrowRight size={18} className="text-indigo-500 shrink-0 mt-0.5 group-hover:translate-x-1 transition-transform" />
         </div>
       </Link>
 
