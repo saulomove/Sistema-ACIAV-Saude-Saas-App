@@ -141,3 +141,36 @@ body {
 .reveal.delay-2 { transition-delay: .16s; }
 .reveal.delay-3 { transition-delay: .24s; }
 .reveal.delay-4 { transition-delay: .32s; }
+
+/* Impressão / PDF dos relatórios (Catálogo de Serviços, Rede Credenciada) */
+@media print {
+  /* Esconde o chrome do painel: menu lateral e barra do topo */
+  aside,
+  header {
+    display: none !important;
+  }
+
+  /* Libera altura/overflow travados pelo layout pra tabela fluir por várias páginas */
+  html,
+  body {
+    height: auto !important;
+    overflow: visible !important;
+    background: #fff !important;
+  }
+  .flex.h-screen,
+  main {
+    height: auto !important;
+    overflow: visible !important;
+  }
+  main {
+    padding: 0 !important;
+  }
+
+  /* Utilitários usados pelas telas de relatório */
+  .no-print {
+    display: none !important;
+  }
+  .print-only {
+    display: block !important;
+  }
+}
