@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { CheckCircle2, Eye, EyeOff, Loader2 } from 'lucide-react';
 
 interface Prefill {
@@ -20,7 +19,6 @@ function formatWhatsapp(v: string) {
 }
 
 export default function BemVindoClient({ prefill }: { prefill: Prefill }) {
-  const router = useRouter();
   const [step, setStep] = useState<1 | 2>(1);
   const [fullName, setFullName] = useState(prefill.fullName);
   const [email, setEmail] = useState(prefill.email);
@@ -72,14 +70,16 @@ export default function BemVindoClient({ prefill }: { prefill: Prefill }) {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         setError(data.message || 'Não foi possível concluir o cadastro.');
+        setLoading(false);
         return;
       }
-      // Sessão foi invalidada no backend — pedir novo login
+      // Sessão foi invalidada no backend — pedir novo login.
+      // Navegação hard (não router.push): evita o Router Cache do Next servir uma
+      // rota autenticada com a sessão já invalidada — mesma causa da tela branca.
       await fetch('/internal/logout', { method: 'POST' }).catch(() => {});
-      router.push('/login?firstAccess=ok');
+      window.location.replace('/login?firstAccess=ok');
     } catch {
       setError('Erro de conexão. Tente novamente.');
-    } finally {
       setLoading(false);
     }
   }

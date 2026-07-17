@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { CreditCard, Search, ActivitySquare, Gift, Settings, LogOut, Users, Menu, X } from 'lucide-react';
 import Image from 'next/image';
 import clsx from 'clsx';
@@ -24,12 +24,13 @@ export default function SidebarPaciente({
   companyName?: string;
 }) {
   const pathname = usePathname();
-  const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
 
   async function handleLogout() {
     await fetch('/internal/logout', { method: 'POST' });
-    router.push('/login');
+    // Navegação hard: descarta o Router Cache do Next e garante estado limpo
+    // após invalidar a sessão — evita servir rota autenticada com cookie já apagado.
+    window.location.replace('/login');
   }
 
   return (

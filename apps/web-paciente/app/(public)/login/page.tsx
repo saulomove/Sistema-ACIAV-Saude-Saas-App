@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { CheckCircle2, Eye, EyeOff, Loader2, AlertCircle } from 'lucide-react';
@@ -17,7 +16,6 @@ function maskCpf(value: string) {
 }
 
 export default function LoginPage() {
-  const router = useRouter();
   const [mode, setMode] = useState<Mode>('cpf');
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
@@ -72,11 +70,13 @@ export default function LoginPage() {
 
       if (!res.ok) {
         setError(data.message || 'Credenciais inválidas.');
+        setLoading(false);
         return;
       }
 
       if (data?.user?.role !== 'patient') {
         setError('Esta área é exclusiva para pacientes. Use o painel administrativo.');
+        setLoading(false);
         return;
       }
 
@@ -86,10 +86,13 @@ export default function LoginPage() {
         body: JSON.stringify({ token: data.token, role: data.user.role }),
       });
 
-      router.push('/portal');
+      // Navegação hard (full reload) em vez de router.push: garante que o cookie
+      // recém-gravado esteja presente na request e evita o Router Cache do Next
+      // resolver /portal contra a sessão anterior (não-autenticada) — causa da tela
+      // branca pós-login. loading segue true de propósito até o documento descarregar.
+      window.location.replace('/portal');
     } catch {
       setError('Erro ao conectar com o servidor. Tente novamente.');
-    } finally {
       setLoading(false);
     }
   }

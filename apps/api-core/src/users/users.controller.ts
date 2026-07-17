@@ -3,7 +3,7 @@ import {
   Param, Body, Query, UseGuards, Req, ForbiddenException,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { Throttle } from '@nestjs/throttler';
+import { SkipThrottle, Throttle } from '@nestjs/throttler';
 import { UsersService } from './users.service';
 
 @Controller('users')
@@ -86,6 +86,10 @@ export class UsersController {
     return this.usersService.importBatch(effectiveUnitId, sanitized);
   }
 
+  // Leitura do próprio cartão, chamada em todo load do portal (pelo layout do
+  // web-paciente). @SkipThrottle porque o Next chama server-side (mesmo IP p/ todos)
+  // e o throttle global derrubava a plataforma inteira. Protegido por JWT.
+  @SkipThrottle()
   @Get('me/card')
   getMyCard(@Req() req: any) {
     return this.usersService.getPatientCard(req.user.userId);

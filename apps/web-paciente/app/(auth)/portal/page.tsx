@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
-import { getSessionUser, serverFetch } from '../../../lib/server-api';
+import { getSessionUser, serverFetch, serverFetchCached } from '../../../lib/server-api';
 import Link from 'next/link';
 import Image from 'next/image';
 import { ArrowRight, MapPin, HeartPulse, ShieldAlert, Star, Sparkles } from 'lucide-react';
@@ -33,7 +33,7 @@ export default async function PortalPacientePage() {
   if (!user || user.role !== 'patient') redirect('/login');
 
   const [card, summary] = await Promise.all([
-    serverFetch<PatientCard>(`/users/me/card`),
+    serverFetchCached<PatientCard>(`/users/me/card`),
     serverFetch<PatientSummary>(`/portal-paciente/summary`),
   ]);
 

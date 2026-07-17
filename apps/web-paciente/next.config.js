@@ -2,8 +2,18 @@
 const withPWA = require('@ducanh2912/next-pwa').default({
   dest: 'public',
   register: true,
-  skipWaiting: true,
+  // skipWaiting: false — NÃO ativar o SW novo no meio de uma sessão. Com true, um
+  // deploy fazia o SW da build nova sequestrar a aba aberta e (com cleanupOutdatedCaches)
+  // apagar o precache da build antiga, cujos chunks o `next build` já removeu do disco →
+  // ChunkLoadError → tela branca pós-login. O SW novo só assume no próximo carregamento.
+  skipWaiting: false,
   disable: process.env.NODE_ENV === 'development',
+  // dynamicStartUrl/cacheStartUrl OFF: por padrão o next-pwa injeta uma rota
+  // NetworkFirst para "/" NA FRENTE do runtimeCaching abaixo, e um cacheWillUpdate
+  // que transforma redirects opacos em falso 200 — e "/" só faz redirect(). Isso
+  // quebrava a navegação para "/". Desligado, "/" cai nas regras explícitas abaixo.
+  cacheStartUrl: false,
+  dynamicStartUrl: false,
   // IMPORTANTE: NÃO cachear navegações server-rendered.
   // Páginas com query params dinâmicos (?type=, ?city=, etc) DEVEM ir
   // direto pro server. Cache do SW só cobre assets estáticos.
@@ -66,9 +76,12 @@ const withPWA = require('@ducanh2912/next-pwa').default({
         urlPattern: ({ url }) => url.pathname.startsWith('/internal/'),
         handler: 'NetworkOnly',
       },
-      // /portal/** (HTML server-rendered) também sempre rede
+      // /portal e /portal/** (HTML/RSC server-rendered) sempre rede.
+      // startsWith('/portal') sem barra final para casar TAMBÉM /portal exato — a
+      // request RSC do router.push para /portal tem mode 'cors' (não 'navigate'),
+      // então sem esta regra ela escaparia do NetworkOnly.
       {
-        urlPattern: ({ url, request }) => request.mode === 'navigate' || url.pathname.startsWith('/portal/'),
+        urlPattern: ({ url, request }) => request.mode === 'navigate' || url.pathname.startsWith('/portal'),
         handler: 'NetworkOnly',
       },
     ],

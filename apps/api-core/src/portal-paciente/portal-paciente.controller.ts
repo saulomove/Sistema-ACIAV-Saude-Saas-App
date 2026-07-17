@@ -14,7 +14,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { Throttle } from '@nestjs/throttler';
+import { SkipThrottle, Throttle } from '@nestjs/throttler';
 import type { Response } from 'express';
 import { PortalPacienteService } from './portal-paciente.service';
 
@@ -38,12 +38,17 @@ export class PortalPacienteController {
     };
   }
 
+  // GETs de leitura chamados em todo load do portal (layout + página) via Next
+  // server-side (mesmo IP p/ todos os usuários). @SkipThrottle evita que o throttle
+  // global (compartilhado) derrube a plataforma. Protegidos por JWT + ensurePatient.
+  @SkipThrottle()
   @Get('summary')
   summary(@Req() req: any) {
     this.ensurePatient(req);
     return this.service.getSummary(req.user.userId);
   }
 
+  @SkipThrottle()
   @Get('first-access')
   firstAccessState(@Req() req: any) {
     this.ensurePatient(req);

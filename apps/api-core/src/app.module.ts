@@ -28,7 +28,11 @@ import { ReadOnlyProviderGuard } from './common/guards/read-only-role.guard';
 
 @Module({
   imports: [
-    ThrottlerModule.forRoot([{ ttl: 60000, limit: 10 }]),
+    // limit 60/60s: o Next chama a API server-side (mesmo IP p/ todos os usuários),
+    // então este balde é compartilhado pela plataforma. 10 era irreal e causava 429
+    // em massa. Os endpoints sensíveis têm @Throttle próprio; os GETs de leitura do
+    // portal usam @SkipThrottle.
+    ThrottlerModule.forRoot([{ ttl: 60000, limit: 60 }]),
     PrismaModule,
     AuditModule,
     EmailModule,

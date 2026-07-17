@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 import { headers } from 'next/headers';
-import { getSessionUser, serverFetch } from '../../lib/server-api';
+import { getSessionUser, serverFetch, serverFetchCached } from '../../lib/server-api';
 import SidebarPaciente from '../../components/SidebarPaciente';
 import InstallPrompt from '../../components/InstallPrompt';
 import OfflineBanner from '../../components/OfflineBanner';
@@ -16,7 +16,7 @@ interface PatientCard {
 }
 
 function HeaderPaciente({ name, company }: { name: string; company: string }) {
-  const initials = name.split(' ').slice(0, 2).map((n) => n[0]).join('').toUpperCase();
+  const initials = (name || 'Paciente').trim().split(/\s+/).slice(0, 2).map((n) => n[0] ?? '').join('').toUpperCase();
   return (
     <header className="h-20 bg-white border-b border-gray-100 flex items-center justify-between px-8 sticky top-0 z-10 shadow-sm">
       {/* Mobile logo */}
@@ -57,8 +57,8 @@ export default async function PacienteLayout({ children }: { children: React.Rea
     if (!currentPath.startsWith(onboardingPath)) redirect(onboardingPath);
   }
 
-  const card = await serverFetch<PatientCard>(`/users/me/card`);
-  const patientName = card?.fullName ?? user.email;
+  const card = await serverFetchCached<PatientCard>(`/users/me/card`);
+  const patientName = card?.fullName ?? user.email ?? 'Paciente';
   const companyName = card?.company?.corporateName ?? '';
 
   return (

@@ -21,16 +21,21 @@ export default async function BemVindoPage() {
   if (!state) redirect('/login');
   if (state.firstAccessDone) redirect('/portal');
 
-  const birthDate = state.prefill.birthDate
-    ? new Date(state.prefill.birthDate).toISOString().slice(0, 10)
-    : '';
+  // prefill pode vir ausente (service retorna sem ele quando userId é null) e
+  // birthDate pode ser uma data inválida — ambos quebrariam o render sem guard.
+  const prefill = state.prefill ?? { fullName: '', email: '', whatsapp: '', birthDate: null };
+  let birthDate = '';
+  if (prefill.birthDate) {
+    const d = new Date(prefill.birthDate);
+    if (!Number.isNaN(d.getTime())) birthDate = d.toISOString().slice(0, 10);
+  }
 
   return (
     <BemVindoClient
       prefill={{
-        fullName: state.prefill.fullName,
-        email: state.prefill.email,
-        whatsapp: state.prefill.whatsapp,
+        fullName: prefill.fullName ?? '',
+        email: prefill.email ?? '',
+        whatsapp: prefill.whatsapp ?? '',
         birthDate,
       }}
     />
