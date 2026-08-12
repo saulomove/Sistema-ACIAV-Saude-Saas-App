@@ -61,7 +61,7 @@ export class UnitsController {
   }
 
   @Post()
-  create(@Req() req: any, @Body() body: { name: string; subdomain: string; settings?: string }) {
+  create(@Req() req: any, @Body() body: { name: string; subdomain: string; settings?: string; supportWhatsapp?: string | null }) {
     if (req.user?.role !== 'super_admin') {
       throw new ForbiddenException('Acesso restrito ao Super Admin.');
     }

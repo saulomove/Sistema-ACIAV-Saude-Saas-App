@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { Building, Plus, Globe, Pencil, Loader2 } from 'lucide-react';
+import { Building, Plus, Globe, Pencil, Loader2, MessageCircle } from 'lucide-react';
 import Modal from '../../../components/Modal';
 import { api } from '../../../lib/api-client';
 
@@ -10,11 +10,21 @@ interface Unit {
   id: string;
   name: string;
   subdomain: string;
+  supportWhatsapp?: string | null;
   status: boolean;
   _count?: { users: number; companies: number; providers: number };
 }
 
-const EMPTY_FORM = { name: '', subdomain: '' };
+const EMPTY_FORM = { name: '', subdomain: '', supportWhatsapp: '' };
+
+// Máscara (DD) 9XXXX-XXXX. Guarda só dígitos, SEM o 55 — o link wa.me adiciona.
+function formatWhats(v: string): string {
+  const d = v.replace(/\D/g, '').slice(0, 11);
+  if (d.length <= 2) return d;
+  if (d.length <= 6) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
+  if (d.length <= 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+  return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+}
 
 export default function UnidadesClient({ units, role }: { units: unknown[]; role: string }) {
   const router = useRouter();
@@ -38,7 +48,7 @@ export default function UnidadesClient({ units, role }: { units: unknown[]; role
 
   function openEdit(u: Unit) {
     setEditingId(u.id);
-    setForm({ name: u.name, subdomain: u.subdomain });
+    setForm({ name: u.name, subdomain: u.subdomain, supportWhatsapp: formatWhats(u.supportWhatsapp ?? '') });
     setError('');
     setModalOpen(true);
   }
@@ -51,10 +61,15 @@ export default function UnidadesClient({ units, role }: { units: unknown[]; role
     setSaving(true);
     setError('');
     try {
+      const payload = {
+        name: form.name,
+        subdomain: form.subdomain,
+        supportWhatsapp: form.supportWhatsapp.replace(/\D/g, '') || null,
+      };
       if (editingId) {
-        await api.put(`/units/${editingId}`, { name: form.name, subdomain: form.subdomain });
+        await api.put(`/units/${editingId}`, payload);
       } else {
-        await api.post('/units', { name: form.name, subdomain: form.subdomain });
+        await api.post('/units', payload);
       }
       setModalOpen(false);
       startTransition(() => router.refresh());
@@ -117,6 +132,12 @@ export default function UnidadesClient({ units, role }: { units: unknown[]; role
                     <Globe size={12} className="text-slate-400" />
                     {unit.subdomain}.aciavsaude.com.br
                   </div>
+                  {unit.supportWhatsapp && (
+                    <div className="flex items-center gap-1 text-xs text-slate-500 mt-1">
+                      <MessageCircle size={12} className="text-emerald-500" />
+                      {formatWhats(unit.supportWhatsapp)}
+                    </div>
+                  )}
                 </div>
               </div>
               <button
@@ -181,6 +202,20 @@ export default function UnidadesClient({ units, role }: { units: unknown[]; role
               />
               <span className="bg-slate-100 border border-gray-200 text-slate-500 px-3 py-2.5 rounded-r-lg text-sm">.aciavsaude.com.br</span>
             </div>
+          </div>
+          <div>
+            <label className="block text-sm font-bold text-slate-700 mb-1.5">WhatsApp da Ouvidoria / Suporte</label>
+            <input
+              type="text"
+              value={form.supportWhatsapp}
+              onChange={(e) => setForm({ ...form, supportWhatsapp: formatWhats(e.target.value) })}
+              className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-slate-50"
+              placeholder="(49) 90000-0000"
+              inputMode="numeric"
+            />
+            <p className="text-xs text-slate-400 mt-1">
+              Só DDD + número, <strong>sem o +55</strong>. É o número que recebe as manifestações da Ouvidoria no app do beneficiário.
+            </p>
           </div>
 
           {error && (

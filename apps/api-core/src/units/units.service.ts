@@ -90,8 +90,17 @@ export class UnitsService {
     });
   }
 
-  async create(data: { name: string; subdomain: string; settings?: string }) {
-    return this.prisma.unit.create({ data });
+  async create(data: { name: string; subdomain: string; settings?: string; supportWhatsapp?: string | null }) {
+    const clean: { name: string; subdomain: string; settings?: string; supportWhatsapp?: string | null } = {
+      name: data.name,
+      subdomain: data.subdomain,
+    };
+    if (data.settings !== undefined) clean.settings = data.settings;
+    if (data.supportWhatsapp !== undefined) {
+      const raw = typeof data.supportWhatsapp === 'string' ? data.supportWhatsapp.replace(/\D/g, '') : null;
+      clean.supportWhatsapp = raw ? raw : null;
+    }
+    return this.prisma.unit.create({ data: clean });
   }
 
   async update(id: string, data: {
