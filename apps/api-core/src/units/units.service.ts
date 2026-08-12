@@ -81,6 +81,15 @@ export class UnitsService {
     return { ...unit, settings: sanitizeSettings(unit.settings) };
   }
 
+  // Retorno enxuto p/ o app do paciente (Ouvidoria): só o que é seguro expor,
+  // sem o objeto Unit inteiro (settings/policies).
+  async getSupportInfo(id: string) {
+    return this.prisma.unit.findUnique({
+      where: { id },
+      select: { name: true, supportWhatsapp: true },
+    });
+  }
+
   async create(data: { name: string; subdomain: string; settings?: string }) {
     return this.prisma.unit.create({ data });
   }

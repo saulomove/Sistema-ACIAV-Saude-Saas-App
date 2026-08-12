@@ -20,11 +20,12 @@ model Unit {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  companies  Company[]
-  users      User[]
-  providers  Provider[]
-  auditLogs  AuditLog[]
-  categories Category[]
+  companies          Company[]
+  users              User[]
+  providers          Provider[]
+  auditLogs          AuditLog[]
+  categories         Category[]
+  ouvidoriaMensagens OuvidoriaMensagem[]
 }
 
 model Company {
@@ -349,4 +350,26 @@ model Category {
 
   @@unique([unitId, slug])
   @@index([unitId, order])
+}
+
+model OuvidoriaMensagem {
+  id         String   @id @default(uuid())
+  unitId     String
+  userId     String? // beneficiário que enviou (snapshot de nome/cpf mantido abaixo)
+  authUserId String?
+  nome       String
+  cpf        String?
+  categoria  String // 'reclamacao' | 'sugestao' | 'elogio' | 'duvida'
+  assunto    String
+  mensagem   String
+  status     String   @default("aberta") // 'aberta' | 'resolvida'
+  ip         String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  unit Unit @relation(fields: [unitId], references: [id], onDelete: Cascade)
+
+  @@index([unitId, status, createdAt])
+  @@index([userId])
 }

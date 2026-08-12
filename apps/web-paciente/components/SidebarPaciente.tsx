@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { CreditCard, Search, ActivitySquare, Gift, Settings, LogOut, Users, Menu, X } from 'lucide-react';
+import { CreditCard, Search, ActivitySquare, Gift, Settings, LogOut, Users, Menu, Megaphone, X } from 'lucide-react';
 import Image from 'next/image';
 import clsx from 'clsx';
 import { useState } from 'react';
@@ -13,6 +13,7 @@ const menuItems = [
   { name: 'Guia Médico', icon: Search, href: '/portal/guia' },
   { name: 'Meu Histórico de Uso', icon: ActivitySquare, href: '/portal/historico' },
   { name: 'Resgatar Prêmios', icon: Gift, href: '/portal/premios', soon: true },
+  { name: 'Ouvidoria', icon: Megaphone, href: '/portal/ouvidoria' },
   { name: 'Configurações', icon: Settings, href: '/portal/configuracoes' },
 ];
 

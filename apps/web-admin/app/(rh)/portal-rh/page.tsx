@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 import { getSessionUser, serverFetch } from '../../../lib/server-api';
 import Link from 'next/link';
-import { Users, UserPlus, TrendingUp, Activity, FileSpreadsheet, ArrowRight } from 'lucide-react';
+import { Users, UserPlus, TrendingUp, Activity, ArrowRight } from 'lucide-react';
 
 interface CompanyStats {
   totalColaboradores: number;
@@ -80,12 +80,6 @@ export default async function PortalRHPage() {
         </div>
         <div className="flex items-center gap-3">
           <Link
-            href="/portal-rh/importar"
-            className="bg-white border border-gray-200 hover:bg-gray-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 shadow-sm"
-          >
-            <FileSpreadsheet size={16} /> Importar Planilha
-          </Link>
-          <Link
             href="/portal-rh/colaboradores"
             className="bg-secondary hover:bg-orange-600 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm flex items-center gap-2"
           >
@@ -128,9 +122,6 @@ export default async function PortalRHPage() {
           <div className="py-10 text-center text-slate-400">
             <Users size={36} className="mx-auto mb-3 opacity-30" />
             <p>Nenhum colaborador cadastrado ainda.</p>
-            <Link href="/portal-rh/importar" className="text-secondary text-sm font-medium mt-2 inline-block hover:underline">
-              Importar planilha
-            </Link>
           </div>
         ) : (
           <div className="space-y-3">

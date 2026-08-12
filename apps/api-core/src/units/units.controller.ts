@@ -48,6 +48,18 @@ export class UnitsController {
     return this.unitsService.findOne(id);
   }
 
+  // Info de contato enxuta (nome + WhatsApp de suporte). Usada pelo app do
+  // paciente (Ouvidoria) p/ não trafegar o Unit inteiro (settings/policies).
+  @Get(':id/support')
+  supportInfo(@Req() req: any, @Param('id') id: string) {
+    const isOwner = req.user?.unitId === id;
+    const isSuperAdmin = req.user?.role === 'super_admin';
+    if (!isOwner && !isSuperAdmin) {
+      throw new ForbiddenException('Acesso negado.');
+    }
+    return this.unitsService.getSupportInfo(id);
+  }
+
   @Post()
   create(@Req() req: any, @Body() body: { name: string; subdomain: string; settings?: string }) {
     if (req.user?.role !== 'super_admin') {

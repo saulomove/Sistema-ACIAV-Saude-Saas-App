@@ -24,6 +24,7 @@ import { WebhooksModule } from './webhooks/webhooks.module';
 import { CategoriesModule } from './categories/categories.module';
 import { MobileModule } from './mobile/mobile.module';
 import { PushModule } from './push/push.module';
+import { OuvidoriaModule } from './ouvidoria/ouvidoria.module';
 import { ReadOnlyProviderGuard } from './common/guards/read-only-role.guard';
 
 @Module({
@@ -53,6 +54,7 @@ import { ReadOnlyProviderGuard } from './common/guards/read-only-role.guard';
     CategoriesModule,
     MobileModule,
     PushModule,
+    OuvidoriaModule,
   ],
   controllers: [AppController],
   providers: [
