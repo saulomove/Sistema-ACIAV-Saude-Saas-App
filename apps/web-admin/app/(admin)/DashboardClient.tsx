@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Activity, Users, Building, TrendingUp, ChevronRight, ArrowUpRight } from 'lucide-react';
+import { Activity, Users, Building, TrendingUp, TrendingDown, ChevronRight, ArrowUpRight, Briefcase } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
@@ -37,12 +37,24 @@ function formatNumber(value: number): string {
   return value.toLocaleString('pt-BR');
 }
 
+interface CagedItem {
+  refMonth: string;
+  saldo: number | null;
+  estoque: number | null;
+}
+interface CagedData {
+  unit: { cityName: string | null; state: string | null } | null;
+  items: CagedItem[];
+}
+
 export default function DashboardClient({
   stats,
   ranking,
+  caged,
 }: {
   stats: DashboardData | null;
   ranking: Provider[] | null;
+  caged?: CagedData | null;
 }) {
   const cards = [
     {
@@ -137,6 +149,42 @@ export default function DashboardClient({
           );
         })}
       </motion.div>
+
+      {caged && caged.items.length > 0 && (caged.items[0].estoque !== null || caged.items[0].saldo !== null) && (() => {
+        const latest = caged.items[0];
+        const prev = caged.items[1];
+        const useEstoque = latest.estoque !== null && latest.estoque !== undefined;
+        const value = useEstoque ? latest.estoque! : (latest.saldo ?? 0);
+        const label = useEstoque ? 'Empregos formais ativos (estoque)' : 'Saldo de empregos (mês)';
+        const cidade = caged.unit?.cityName ? `${caged.unit.cityName}${caged.unit.state ? '/' + caged.unit.state : ''}` : 'município';
+        const [y, m] = latest.refMonth.split('-');
+        const prevVal = prev ? (useEstoque ? prev.estoque : prev.saldo) : null;
+        const delta = prevVal !== null && prevVal !== undefined ? value - prevVal : null;
+        const up = delta === null ? value >= 0 : delta >= 0;
+        return (
+          <motion.div
+            variants={itemVariants}
+            className="bg-white p-6 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+          >
+            <div className="flex items-center gap-4">
+              <div className="p-4 rounded-2xl bg-indigo-50 text-indigo-600">
+                <Briefcase size={24} strokeWidth={2.5} />
+              </div>
+              <div>
+                <p className="text-sm font-bold tracking-wider uppercase text-slate-400">{label} · {cidade}</p>
+                <p className="text-3xl font-black text-slate-800 tracking-tight mt-1">
+                  {(useEstoque ? '' : value > 0 ? '+' : '') + value.toLocaleString('pt-BR')}
+                  <span className="text-sm font-medium text-slate-400 ml-2">competência {m}/{y}</span>
+                </p>
+              </div>
+            </div>
+            <div className={`flex items-center gap-1 font-bold text-sm px-3 py-1.5 rounded-full w-fit ${up ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
+              {up ? <TrendingUp size={16} /> : <TrendingDown size={16} />}
+              {delta !== null ? `${delta >= 0 ? '+' : ''}${delta.toLocaleString('pt-BR')} vs mês anterior` : 'CAGED'}
+            </div>
+          </motion.div>
+        );
+      })()}
 
       {/* Charts & Lists */}
       <motion.div variants={itemVariants} className="grid grid-cols-1 lg:grid-cols-3 gap-8">

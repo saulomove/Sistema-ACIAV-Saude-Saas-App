@@ -15,6 +15,9 @@ model Unit {
   subdomain       String   @unique
   settings        String? // JSON string
   supportWhatsapp String?
+  cityName        String?
+  state           String?
+  ibgeCode        String?
   featuresRewards Boolean  @default(false)
   status          Boolean  @default(true)
   createdAt       DateTime @default(now())
@@ -26,6 +29,7 @@ model Unit {
   auditLogs          AuditLog[]
   categories         Category[]
   ouvidoriaMensagens OuvidoriaMensagem[]
+  cagedStats         CagedStat[]
 }
 
 model Company {
@@ -372,4 +376,21 @@ model OuvidoriaMensagem {
 
   @@index([unitId, status, createdAt])
   @@index([userId])
+}
+
+model CagedStat {
+  id            String   @id @default(uuid())
+  unitId        String
+  refMonth      String // competência "AAAA-MM" (ex: "2026-06")
+  saldo         Int? // saldo do mês = admissões - desligamentos (Novo CAGED)
+  admissoes     Int?
+  desligamentos Int?
+  estoque       Int? // estoque de vínculos formais ativos ("quantos funcionários") — via RAIS/automático
+  source        String   @default("manual") // 'manual' | 'bigquery'
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  unit Unit @relation(fields: [unitId], references: [id], onDelete: Cascade)
+
+  @@unique([unitId, refMonth])
 }

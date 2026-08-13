@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard, Users, Building, Stethoscope, FileText, Settings,
-  Award, LogOut, Globe, DollarSign, ShieldCheck, BarChart3, Menu, X, History, Megaphone,
+  Award, LogOut, Globe, DollarSign, ShieldCheck, BarChart3, Menu, X, History, Megaphone, Briefcase,
 } from 'lucide-react';
 import Image from 'next/image';
 import clsx from 'clsx';
@@ -21,6 +21,7 @@ function getMenuItems(role: string): MenuItem[] {
         { name: 'Usuários Admin', icon: ShieldCheck, href: '/admin-users' },
         { name: 'Faturamento', icon: DollarSign, href: '/faturamento' },
         { name: 'Auditoria', icon: History, href: '/auditoria' },
+        { name: 'CAGED', icon: Briefcase, href: '/caged' },
         { name: 'Ouvidoria', icon: Megaphone, href: '/ouvidoria' },
         { name: 'Configurações', icon: Settings, href: '/configuracoes' },
       ];
@@ -32,6 +33,7 @@ function getMenuItems(role: string): MenuItem[] {
         { name: 'Credenciados', icon: Stethoscope, href: '/credenciados' },
         { name: 'Relatórios', icon: BarChart3, href: '/relatorios' },
         { name: 'Auditoria', icon: History, href: '/auditoria' },
+        { name: 'CAGED', icon: Briefcase, href: '/caged' },
         { name: 'Ouvidoria', icon: Megaphone, href: '/ouvidoria' },
         { name: 'Configurações', icon: Settings, href: '/configuracoes' },
       ];

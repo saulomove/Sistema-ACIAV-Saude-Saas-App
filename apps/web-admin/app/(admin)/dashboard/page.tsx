@@ -12,10 +12,11 @@ export default async function Dashboard() {
     return <SuperAdminDashboard stats={globalStats} />;
   }
 
-  const [stats, ranking] = await Promise.all([
+  const [stats, ranking, caged] = await Promise.all([
     serverFetch<any>(`/stats/dashboard?unitId=${unitId}`),
     serverFetch<any[]>(`/providers/ranking?unitId=${unitId}&limit=5`),
+    role === 'admin_unit' ? serverFetch<any>(`/caged?unitId=${unitId}`) : Promise.resolve(null),
   ]);
 
-  return <DashboardClient stats={stats} ranking={ranking} />;
+  return <DashboardClient stats={stats} ranking={ranking} caged={caged} />;
 }

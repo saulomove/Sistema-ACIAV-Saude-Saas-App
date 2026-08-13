@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { Building, Plus, Globe, Pencil, Loader2, MessageCircle } from 'lucide-react';
+import { Building, Plus, Globe, Pencil, Loader2, MessageCircle, MapPin } from 'lucide-react';
 import Modal from '../../../components/Modal';
 import { api } from '../../../lib/api-client';
 
@@ -11,11 +11,14 @@ interface Unit {
   name: string;
   subdomain: string;
   supportWhatsapp?: string | null;
+  cityName?: string | null;
+  state?: string | null;
+  ibgeCode?: string | null;
   status: boolean;
   _count?: { users: number; companies: number; providers: number };
 }
 
-const EMPTY_FORM = { name: '', subdomain: '', supportWhatsapp: '' };
+const EMPTY_FORM = { name: '', subdomain: '', supportWhatsapp: '', cityName: '', state: '', ibgeCode: '' };
 
 // Máscara (DD) 9XXXX-XXXX. Guarda só dígitos, SEM o 55 — o link wa.me adiciona.
 function formatWhats(v: string): string {
@@ -48,7 +51,14 @@ export default function UnidadesClient({ units, role }: { units: unknown[]; role
 
   function openEdit(u: Unit) {
     setEditingId(u.id);
-    setForm({ name: u.name, subdomain: u.subdomain, supportWhatsapp: formatWhats(u.supportWhatsapp ?? '') });
+    setForm({
+      name: u.name,
+      subdomain: u.subdomain,
+      supportWhatsapp: formatWhats(u.supportWhatsapp ?? ''),
+      cityName: u.cityName ?? '',
+      state: u.state ?? '',
+      ibgeCode: u.ibgeCode ?? '',
+    });
     setError('');
     setModalOpen(true);
   }
@@ -65,6 +75,9 @@ export default function UnidadesClient({ units, role }: { units: unknown[]; role
         name: form.name,
         subdomain: form.subdomain,
         supportWhatsapp: form.supportWhatsapp.replace(/\D/g, '') || null,
+        cityName: form.cityName.trim() || null,
+        state: form.state.trim().toUpperCase() || null,
+        ibgeCode: form.ibgeCode.replace(/\D/g, '') || null,
       };
       if (editingId) {
         await api.put(`/units/${editingId}`, payload);
@@ -132,6 +145,12 @@ export default function UnidadesClient({ units, role }: { units: unknown[]; role
                     <Globe size={12} className="text-slate-400" />
                     {unit.subdomain}.aciavsaude.com.br
                   </div>
+                  {(unit.cityName || unit.state) && (
+                    <div className="flex items-center gap-1 text-xs text-slate-500 mt-1">
+                      <MapPin size={12} className="text-slate-400" />
+                      {[unit.cityName, unit.state].filter(Boolean).join('/')}
+                    </div>
+                  )}
                   {unit.supportWhatsapp && (
                     <div className="flex items-center gap-1 text-xs text-slate-500 mt-1">
                       <MessageCircle size={12} className="text-emerald-500" />
@@ -202,6 +221,43 @@ export default function UnidadesClient({ units, role }: { units: unknown[]; role
               />
               <span className="bg-slate-100 border border-gray-200 text-slate-500 px-3 py-2.5 rounded-r-lg text-sm">.aciavsaude.com.br</span>
             </div>
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            <div className="col-span-2">
+              <label className="block text-sm font-bold text-slate-700 mb-1.5">Cidade (município)</label>
+              <input
+                type="text"
+                value={form.cityName}
+                onChange={(e) => setForm({ ...form, cityName: e.target.value })}
+                className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-slate-50"
+                placeholder="Ex: Videira"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-slate-700 mb-1.5">UF</label>
+              <input
+                type="text"
+                value={form.state}
+                onChange={(e) => setForm({ ...form, state: e.target.value.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 2) })}
+                className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-slate-50 uppercase"
+                placeholder="SC"
+                maxLength={2}
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-bold text-slate-700 mb-1.5">
+              Código IBGE do município <span className="font-normal text-slate-400">(opcional)</span>
+            </label>
+            <input
+              type="text"
+              value={form.ibgeCode}
+              onChange={(e) => setForm({ ...form, ibgeCode: e.target.value.replace(/\D/g, '').slice(0, 7) })}
+              className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-slate-50 font-mono"
+              placeholder="4218707"
+              inputMode="numeric"
+            />
+            <p className="text-xs text-slate-400 mt-1">7 dígitos. Usado no CAGED (e no futuro import automático). Videira/SC = 4219309.</p>
           </div>
           <div>
             <label className="block text-sm font-bold text-slate-700 mb-1.5">WhatsApp da Ouvidoria / Suporte</label>

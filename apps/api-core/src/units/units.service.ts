@@ -90,8 +90,24 @@ export class UnitsService {
     });
   }
 
-  async create(data: { name: string; subdomain: string; settings?: string; supportWhatsapp?: string | null }) {
-    const clean: { name: string; subdomain: string; settings?: string; supportWhatsapp?: string | null } = {
+  async create(data: {
+    name: string;
+    subdomain: string;
+    settings?: string;
+    supportWhatsapp?: string | null;
+    cityName?: string | null;
+    state?: string | null;
+    ibgeCode?: string | null;
+  }) {
+    const clean: {
+      name: string;
+      subdomain: string;
+      settings?: string;
+      supportWhatsapp?: string | null;
+      cityName?: string | null;
+      state?: string | null;
+      ibgeCode?: string | null;
+    } = {
       name: data.name,
       subdomain: data.subdomain,
     };
@@ -100,6 +116,9 @@ export class UnitsService {
       const raw = typeof data.supportWhatsapp === 'string' ? data.supportWhatsapp.replace(/\D/g, '') : null;
       clean.supportWhatsapp = raw ? raw : null;
     }
+    if (data.cityName !== undefined) clean.cityName = data.cityName?.trim() || null;
+    if (data.state !== undefined) clean.state = (data.state ?? '').trim().toUpperCase().slice(0, 2) || null;
+    if (data.ibgeCode !== undefined) clean.ibgeCode = (typeof data.ibgeCode === 'string' ? data.ibgeCode.replace(/\D/g, '') : '') || null;
     return this.prisma.unit.create({ data: clean });
   }
 
@@ -109,6 +128,9 @@ export class UnitsService {
     settings?: string;
     status?: boolean;
     supportWhatsapp?: string | null;
+    cityName?: string | null;
+    state?: string | null;
+    ibgeCode?: string | null;
     featuresRewards?: boolean;
   }) {
     const allowed: any = {};
@@ -123,6 +145,9 @@ export class UnitsService {
       const raw = typeof data.supportWhatsapp === 'string' ? data.supportWhatsapp.replace(/\D/g, '') : null;
       allowed.supportWhatsapp = raw ? raw : null;
     }
+    if (data.cityName !== undefined) allowed.cityName = data.cityName?.trim() || null;
+    if (data.state !== undefined) allowed.state = (data.state ?? '').trim().toUpperCase().slice(0, 2) || null;
+    if (data.ibgeCode !== undefined) allowed.ibgeCode = (typeof data.ibgeCode === 'string' ? data.ibgeCode.replace(/\D/g, '') : '') || null;
     if (data.featuresRewards !== undefined) allowed.featuresRewards = !!data.featuresRewards;
     const updated = await this.prisma.unit.update({ where: { id }, data: allowed });
     return { ...updated, settings: sanitizeSettings(updated.settings) };
