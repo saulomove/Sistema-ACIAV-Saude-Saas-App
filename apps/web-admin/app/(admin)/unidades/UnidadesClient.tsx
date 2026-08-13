@@ -254,7 +254,7 @@ export default function UnidadesClient({ units, role }: { units: unknown[]; role
               value={form.ibgeCode}
               onChange={(e) => setForm({ ...form, ibgeCode: e.target.value.replace(/\D/g, '').slice(0, 7) })}
               className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-slate-50 font-mono"
-              placeholder="4218707"
+              placeholder="4219309"
               inputMode="numeric"
             />
             <p className="text-xs text-slate-400 mt-1">7 dígitos. Usado no CAGED (e no futuro import automático). Videira/SC = 4219309.</p>
