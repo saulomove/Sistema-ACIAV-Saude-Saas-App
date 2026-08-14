@@ -1,5 +1,6 @@
 import Image from 'next/image';
 import { FOOTER_GROUPS } from '../../lib/landing-data';
+import { GooglePlayBadge } from './AppBadges';
 
 export default function Footer() {
   return (
@@ -24,6 +25,10 @@ export default function Footer() {
               Saúde corporativa acessível, moderna e sem burocracia. Conectamos empresas, colaboradores e
               clínicas em uma só rede.
             </p>
+            <div className="mt-5">
+              <p className="text-white/50 text-[13px] mb-2.5">Baixe o app do beneficiário:</p>
+              <GooglePlayBadge />
+            </div>
           </div>
 
           {FOOTER_GROUPS.map((group) => (
