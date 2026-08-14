@@ -8,6 +8,7 @@ import SavingsCalculator from '../components/landing/SavingsCalculator';
 import Testimonials from '../components/landing/Testimonials';
 import FAQ from '../components/landing/FAQ';
 import FinalCTA from '../components/landing/FinalCTA';
+import AppDownload from '../components/landing/AppDownload';
 import Footer from '../components/landing/Footer';
 
 export default function Home() {
@@ -25,6 +26,7 @@ export default function Home() {
         <SavingsCalculator />
         <Testimonials />
         <FAQ />
+        <AppDownload />
         <FinalCTA />
       </main>
       <Footer />
