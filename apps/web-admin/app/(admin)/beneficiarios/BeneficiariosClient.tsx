@@ -223,7 +223,7 @@ export default function BeneficiariosClient({
   const fileRef = useRef<HTMLInputElement>(null);
 
   const [resettingPassword, setResettingPassword] = useState(false);
-  const [resetResult, setResetResult] = useState<{ tempPassword: string; email: string } | null>(null);
+  const [resetResult, setResetResult] = useState<{ resetToCpf: boolean; cpf: string; email: string } | null>(null);
   const [resetTarget, setResetTarget] = useState<User | null>(null);
   const [resetBusy, setResetBusy] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -290,11 +290,11 @@ export default function BeneficiariosClient({
     setResettingPassword(true);
     setResetResult(null);
     try {
-      const result = await api.post(`/auth/reset-password/user/${resetTarget.id}`, {}) as { tempPassword: string; email: string };
+      const result = await api.post(`/auth/reset-password/user/${resetTarget.id}`, {}) as { resetToCpf: boolean; cpf: string; email: string };
       setResetResult(result);
       setResetTarget(null);
-    } catch {
-      alert('Erro ao resetar senha. Verifique se o beneficiário possui login cadastrado.');
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'Erro ao resetar senha. Verifique se o beneficiário possui login cadastrado.');
     } finally {
       setResettingPassword(false);
       setResetBusy(false);
@@ -838,19 +838,19 @@ export default function BeneficiariosClient({
                 <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 space-y-3">
                   <div className="flex items-center gap-2">
                     <CheckCircle2 size={18} className="text-emerald-600" />
-                    <p className="text-sm font-bold text-emerald-800">Nova senha temporária gerada!</p>
+                    <p className="text-sm font-bold text-emerald-800">Senha resetada para o CPF!</p>
                   </div>
                   <div className="bg-white border border-emerald-200 rounded-lg px-4 py-3 space-y-1">
-                    <p className="text-xs text-slate-500">Login: <span className="font-bold text-slate-800">{resetResult.email}</span></p>
-                    <p className="text-xs text-slate-500">Senha temporária: <span className="font-bold font-mono text-slate-800">{resetResult.tempPassword}</span></p>
+                    <p className="text-xs text-slate-500">Login: <span className="font-bold font-mono text-slate-800">{resetResult.cpf}</span></p>
+                    <p className="text-xs text-slate-500">Senha: <span className="font-bold font-mono text-slate-800">{resetResult.cpf}</span> <span className="text-slate-400">(o próprio CPF)</span></p>
                   </div>
                   <button
-                    onClick={() => copyCredentials(resetResult.email, resetResult.tempPassword)}
+                    onClick={() => copyCredentials(resetResult.cpf, resetResult.cpf)}
                     className="w-full bg-emerald-600 text-white py-2 rounded-lg text-sm font-bold hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2"
                   >
                     <Copy size={14} /> {copied ? 'Copiado!' : 'Copiar Credenciais'}
                   </button>
-                  <p className="text-xs text-amber-700 font-medium">Anote a senha — ela não será exibida novamente.</p>
+                  <p className="text-xs text-amber-700 font-medium">O beneficiário vai logar com o CPF e será obrigado a definir uma nova senha no próximo acesso.</p>
                 </div>
               )}
 

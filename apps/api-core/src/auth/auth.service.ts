@@ -324,7 +324,23 @@ export class AuthService {
     if (scopedUnitId && authUser.unitId !== scopedUnitId) {
       throw new ForbiddenException('Beneficiário fora do tenant.');
     }
-    return this.resetPassword(authUser.id);
+
+    // Reset do beneficiário: a senha volta a ser o CPF e ele é OBRIGADO a definir uma
+    // nova senha no próximo acesso (o wizard de 1º acesso é gated por User.firstAccessDone).
+    // O login por CPF continua funcionando mesmo se o e-mail já tiver sido trocado no
+    // 1º acesso anterior (o login tem fallback CPF -> User -> AuthUser).
+    const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { cpf: true } });
+    const cpfClean = (user?.cpf || '').replace(/\D/g, '');
+    if (cpfClean.length !== 11) throw new BadRequestException('CPF do beneficiário inválido para reset.');
+
+    const passwordHash = await bcrypt.hash(cpfClean, 10);
+    await this.prisma.$transaction([
+      this.prisma.authUser.update({ where: { id: authUser.id }, data: { passwordHash, passwordChangeRequired: true } }),
+      this.prisma.user.update({ where: { id: userId }, data: { firstAccessDone: false } }),
+      this.prisma.session.deleteMany({ where: { authUserId: authUser.id } }),
+    ]);
+
+    return { resetToCpf: true, cpf: cpfClean, email: authUser.email };
   }
 
   async me(authUserId: string) {
