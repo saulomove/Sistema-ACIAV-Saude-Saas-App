@@ -9,3 +9,6 @@ export const LOGIN_HREF = '/login';
 export const GOOGLE_PLAY_URL =
   process.env.NEXT_PUBLIC_GOOGLE_PLAY_URL ??
   'https://play.google.com/store/apps/details?id=br.com.aciavsaude.paciente';
+export const APP_STORE_URL =
+  process.env.NEXT_PUBLIC_APP_STORE_URL ??
+  'https://apps.apple.com/br/app/id6803305900';

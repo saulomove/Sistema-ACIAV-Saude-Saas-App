@@ -1,5 +1,5 @@
 import { Smartphone } from 'lucide-react';
-import { GooglePlayBadge, AppStoreSoonBadge } from './AppBadges';
+import { GooglePlayBadge, AppStoreBadge } from './AppBadges';
 
 export default function AppDownload() {
   return (
@@ -35,7 +35,7 @@ export default function AppDownload() {
             </p>
             <div className="flex flex-wrap items-center justify-center gap-4">
               <GooglePlayBadge />
-              <AppStoreSoonBadge />
+              <AppStoreBadge />
             </div>
           </div>
         </div>

@@ -1,6 +1,6 @@
 import Image from 'next/image';
 import { FOOTER_GROUPS } from '../../lib/landing-data';
-import { GooglePlayBadge } from './AppBadges';
+import { GooglePlayBadge, AppStoreBadge } from './AppBadges';
 
 export default function Footer() {
   return (
@@ -27,7 +27,10 @@ export default function Footer() {
             </p>
             <div className="mt-5">
               <p className="text-white/50 text-[13px] mb-2.5">Baixe o app do beneficiário:</p>
-              <GooglePlayBadge />
+              <div className="flex flex-wrap gap-3">
+                <GooglePlayBadge />
+                <AppStoreBadge />
+              </div>
             </div>
           </div>
 
