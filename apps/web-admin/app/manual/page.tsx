@@ -7,13 +7,19 @@
  */
 
 const PRINT_CSS = `
-  @page { margin: 16mm 15mm; }
+  @page { margin: 14mm 14mm; }
   .manual-root { --tealD:#08494a; --teal:#007178; --teal2:#14807e; --orange:#e85d1f;
     --ink:#0c1e2a; --ink2:#2b3b48; --muted:#6a7a86; --line:#e7ecef; --warm:#f7f5f1; --teal50:#e6f3f2; }
+  /* Forca a impressao de cores/fundos/gradientes (senao o navegador os remove do PDF). */
+  .manual-root, .manual-root * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
   .manual-root :is(h1,h2,h3,h4){ font-family: var(--font-jakarta), system-ui, sans-serif; }
   @media print {
+    html, body { background:#fff !important; }
     .no-print { display:none !important; }
-    .manual-sheet { box-shadow:none !important; margin:0 !important; border-radius:0 !important; max-width:none !important; }
+    .manual-sheet { box-shadow:none !important; margin:0 !important; border-radius:0 !important; max-width:none !important; width:100% !important; }
     .manual-bg { background:#fff !important; padding:0 !important; }
     .page-break { break-before: page; }
     section, .avoid-break { break-inside: avoid; }
