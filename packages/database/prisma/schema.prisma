@@ -30,6 +30,39 @@ model Unit {
   categories         Category[]
   ouvidoriaMensagens OuvidoriaMensagem[]
   cagedStats         CagedStat[]
+  exportLogs         ExportLog[]
+  cityCodes          CityCode[]
+}
+
+model ExportLog {
+  id            String   @id @default(uuid())
+  unitId        String
+  type          String // 'financeiro'
+  actorName     String?
+  actorRole     String?
+  filters       String? // JSON dos filtros aplicados
+  rowCount      Int      @default(0)
+  excludedCount Int      @default(0)
+  createdAt     DateTime @default(now())
+
+  unit Unit @relation(fields: [unitId], references: [id], onDelete: Cascade)
+
+  @@index([unitId, createdAt])
+}
+
+// De-para cidade -> código do sistema financeiro (coluna codCidade), por unidade.
+model CityCode {
+  id        String   @id @default(uuid())
+  unitId    String
+  cityName  String // normalizado em MAIÚSCULAS
+  code      Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  unit Unit @relation(fields: [unitId], references: [id], onDelete: Cascade)
+
+  @@unique([unitId, cityName])
+  @@index([unitId])
 }
 
 model Company {

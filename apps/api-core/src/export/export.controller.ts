@@ -1,17 +1,20 @@
 import {
+  Body,
   Controller,
   ForbiddenException,
   Get,
+  Put,
   Query,
   Req,
   Res,
   UseGuards,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { Throttle } from '@nestjs/throttler';
+import { SkipThrottle, Throttle } from '@nestjs/throttler';
 import type { Response } from 'express';
 import { ExportService } from './export.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { AuditService } from '../audit/audit.service';
 
 @Controller('export')
 @UseGuards(AuthGuard('jwt'))
@@ -20,7 +23,18 @@ export class ExportController {
   constructor(
     private readonly exportService: ExportService,
     private readonly prisma: PrismaService,
+    private readonly audit: AuditService,
   ) {}
+
+  private actor(req: any) {
+    return {
+      authUserId: req.user.sub,
+      role: req.user.role,
+      name: req.user.email ?? null,
+      ip: (req.headers?.['x-forwarded-for'] as string | undefined)?.split(',')[0] ?? req.ip ?? null,
+      userAgent: (req.headers?.['user-agent'] as string | undefined) ?? null,
+    };
+  }
 
   private assertAdmin(req: any) {
     if (!['super_admin', 'admin_unit'].includes(req.user?.role)) {
@@ -168,5 +182,93 @@ export class ExportController {
       status,
     });
     this.send(res, buffer, `rede-credenciada-${this.stamp()}.xlsx`);
+  }
+
+  // ===== Exportação Financeiro (Cobrança) + de-para de cidades + histórico =====
+
+  @Get('financeiro')
+  async exportFinanceiro(
+    @Req() req: any,
+    @Res() res: Response,
+    @Query('unitId') unitId?: string,
+    @Query('status') status?: string,
+    @Query('companyId') companyId?: string,
+  ) {
+    this.assertAdmin(req);
+    const scope = this.unitScope(req, unitId);
+    if (!scope) throw new ForbiddenException('Selecione uma unidade.');
+    await this.assertCompanyInUnit(companyId, scope, req.user.role);
+    const { buffer, rowCount, excludedCount } =
+      await this.exportService.exportFinanceiro({ unitId: scope, status, companyId });
+    const a = this.actor(req);
+    await this.prisma.exportLog.create({
+      data: {
+        unitId: scope,
+        type: 'financeiro',
+        actorName: a.name,
+        actorRole: a.role,
+        filters: JSON.stringify({ status: status ?? 'active', companyId: companyId ?? null }),
+        rowCount,
+        excludedCount,
+      },
+    });
+    this.audit.log({
+      unitId: scope,
+      actorAuthUserId: a.authUserId,
+      actorName: a.name,
+      actorRole: a.role,
+      entity: 'export',
+      action: 'export_financeiro',
+      diffAfter: { rowCount, excludedCount, status: status ?? 'active' },
+      ip: a.ip,
+      userAgent: a.userAgent,
+    });
+    this.send(res, buffer, `export-financeiro-${this.stamp()}.xlsx`);
+  }
+
+  @SkipThrottle()
+  @Get('financeiro/cities')
+  async getFinanceiroCities(@Req() req: any, @Query('unitId') unitId?: string) {
+    this.assertAdmin(req);
+    const scope = this.unitScope(req, unitId);
+    if (!scope) return { cities: [] };
+    return this.exportService.getCityCodes(scope);
+  }
+
+  @Put('financeiro/cities')
+  async saveFinanceiroCities(
+    @Req() req: any,
+    @Body() body: { unitId?: string; codes?: Record<string, unknown> },
+  ) {
+    this.assertAdmin(req);
+    const scope = this.unitScope(req, body?.unitId);
+    if (!scope) throw new ForbiddenException('Selecione uma unidade.');
+    await this.exportService.saveCityCodes(scope, body?.codes ?? {});
+    const a = this.actor(req);
+    this.audit.log({
+      unitId: scope,
+      actorAuthUserId: a.authUserId,
+      actorName: a.name,
+      actorRole: a.role,
+      entity: 'export',
+      action: 'update_city_codes',
+      diffAfter: (body?.codes ?? {}) as Record<string, unknown>,
+      ip: a.ip,
+      userAgent: a.userAgent,
+    });
+    return { ok: true };
+  }
+
+  @SkipThrottle()
+  @Get('history')
+  async exportHistory(@Req() req: any, @Query('unitId') unitId?: string) {
+    this.assertAdmin(req);
+    const scope = this.unitScope(req, unitId);
+    if (!scope) return [];
+    return this.prisma.exportLog.findMany({
+      where: { unitId: scope },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+    });
   }
 }

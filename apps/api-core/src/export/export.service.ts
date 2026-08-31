@@ -1,7 +1,14 @@
-import { Injectable } from '@nestjs/common';
+import { ForbiddenException, Injectable } from '@nestjs/common';
 import * as XLSX from 'xlsx';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+
+// Colunas EXATAS exigidas pelo sistema financeiro (ordem e nomes do modelo, com cabeçalhos repetidos).
+const FINANCEIRO_HEADER = [
+  'CODIGO_EMPRESA', 'EMPRESA', 'CPF/CNPJ', 'ENDERECO', 'BAIRRO', 'codCidade',
+  'CODIGO_ASSOCIADO', 'ASSOCIADO', 'CPF_TITULAR', 'ENDENRECO_ASSOCIADO', 'BAIRRO', 'CODCIDADE',
+  'TIPO', 'ESTADO_CIVIL', 'CODIGO_DEPENDENTE', 'SEXO', 'CPF_DEPENDENTE', 'DEPENDETE', 'CPF_TITULAR', 'PARENTESCO',
+];
 
 type ExportFilters = {
   unitId?: string;
@@ -275,6 +282,129 @@ export class ExportService {
       return `${Math.round(((orig - disc) / orig) * 100)}%`;
     }
     return '—';
+  }
+
+  // ===== Exportação Financeiro (Cobrança) — formato exato do sistema financeiro =====
+
+  private normCity(s?: string | null): string {
+    return (s ?? '').toUpperCase().trim();
+  }
+
+  /** Só dígitos, como NÚMERO (igual ao modelo: zeros à esquerda caem). Vazio -> ''. */
+  private numVal(s?: string | null): number | string {
+    const d = (s ?? '').toString().replace(/\D/g, '');
+    return d ? Number(d) : '';
+  }
+
+  /** Código externo: número se for só dígitos, senão o texto original. */
+  private codeVal(s?: string | null): number | string {
+    const d = (s ?? '').toString().trim();
+    return /^\d+$/.test(d) ? Number(d) : d;
+  }
+
+  private async getSavedCityCodes(unitId: string): Promise<Record<string, number>> {
+    const rows = await this.prisma.cityCode.findMany({
+      where: { unitId },
+      select: { cityName: true, code: true },
+    });
+    const out: Record<string, number> = {};
+    for (const r of rows) out[this.normCity(r.cityName)] = r.code;
+    return out;
+  }
+
+  /** Lista as cidades das empresas da unidade + o código de-para salvo (para a tela de edição). */
+  async getCityCodes(unitId: string): Promise<{ cities: { name: string; count: number; code: number | null }[] }> {
+    const saved = await this.getSavedCityCodes(unitId);
+    const companies = await this.prisma.company.findMany({
+      where: { unitId, externalCode: { not: null } },
+      select: { city: true },
+    });
+    const counts = new Map<string, number>();
+    for (const c of companies) {
+      const name = this.normCity(c.city);
+      if (!name) continue;
+      counts.set(name, (counts.get(name) ?? 0) + 1);
+    }
+    const cities = [...counts.entries()]
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .map(([name, count]) => ({ name, count, code: saved[name] ?? null }));
+    return { cities };
+  }
+
+  /** Substitui, de forma atômica, o de-para cidade->código da unidade (tabela própria CityCode). */
+  async saveCityCodes(unitId: string, codes: Record<string, unknown>): Promise<void> {
+    const rows: { unitId: string; cityName: string; code: number }[] = [];
+    for (const [k, v] of Object.entries(codes ?? {})) {
+      const cityName = this.normCity(k);
+      if (!cityName) continue;
+      const n = Number(v);
+      if (Number.isFinite(n) && n !== 0) rows.push({ unitId, cityName, code: Math.trunc(n) });
+    }
+    await this.prisma.$transaction([
+      this.prisma.cityCode.deleteMany({ where: { unitId } }),
+      ...(rows.length ? [this.prisma.cityCode.createMany({ data: rows })] : []),
+    ]);
+  }
+
+  /**
+   * Gera o arquivo de cobrança no formato exato do modelo financeiro.
+   * Denormalizado: por empresa -> por titular -> 1 linha do titular (TIPO=T) + 1 por dependente (TIPO=D).
+   * Exclui empresas/beneficiários SEM código externo (testes) — o financeiro casa por esse código.
+   */
+  async exportFinanceiro(opts: {
+    unitId?: string;
+    status?: string;
+    companyId?: string;
+  }): Promise<{ buffer: Buffer; rowCount: number; excludedCount: number }> {
+    const unitId = opts.unitId;
+    if (!unitId) throw new ForbiddenException('Selecione uma unidade.');
+
+    const cityCodes = await this.getSavedCityCodes(unitId);
+
+    const status = opts.status ?? 'active';
+    // O filtro de situação vale para o BENEFICIÁRIO (titular/dependente), não para a empresa —
+    // assim "ativos" = todos os beneficiários ativos, independentemente do status da empresa.
+    const companyWhere: Prisma.CompanyWhereInput = { unitId, externalCode: { not: null } };
+    if (opts.companyId) companyWhere.id = opts.companyId;
+
+    const companies = await this.prisma.company.findMany({
+      where: companyWhere,
+      include: { users: { where: { unitId } } },
+      orderBy: { corporateName: 'asc' },
+    });
+
+    const matchesStatus = (u: { status: boolean }) =>
+      status === 'all' ? true : status === 'inactive' ? !u.status : u.status;
+
+    const rows: (string | number)[][] = [FINANCEIRO_HEADER];
+    let rowCount = 0;
+    let excludedCount = 0;
+
+    for (const c of companies) {
+      if (!c.externalCode) continue; // exclui empresas de teste (sem código externo, ex.: ACIAV/Karikal)
+      const cc = cityCodes[this.normCity(c.city)] ?? '';
+      const emp = [this.codeVal(c.externalCode), c.corporateName ?? '', this.numVal(c.cnpj), c.address ?? '', c.neighborhood ?? '', cc];
+
+      const titulares = c.users.filter((u) => u.type === 'titular' && matchesStatus(u));
+      for (const t of titulares) {
+        if (!t.externalCode) { excludedCount++; continue; }
+        const assoc = [this.codeVal(t.externalCode), t.fullName ?? '', this.numVal(t.cpf), c.address ?? '', c.neighborhood ?? '', cc];
+        rows.push([...emp, ...assoc, 'T', 'OU', this.codeVal(t.externalCode), t.gender || 'N', this.numVal(t.cpf), t.fullName ?? '', this.numVal(t.cpf), '']);
+        rowCount++;
+        const deps = c.users.filter((u) => u.type === 'dependente' && u.parentId === t.id && matchesStatus(u));
+        for (const d of deps) {
+          if (!d.externalCode) { excludedCount++; continue; }
+          rows.push([...emp, ...assoc, 'D', 'OU', this.codeVal(d.externalCode), d.gender || 'N', this.numVal(d.cpf), d.fullName ?? '', this.numVal(t.cpf), d.kinship ?? '']);
+          rowCount++;
+        }
+      }
+    }
+
+    const worksheet = XLSX.utils.aoa_to_sheet(rows);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Planilha1');
+    const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' }) as Buffer;
+    return { buffer, rowCount, excludedCount };
   }
 
   private buildWorkbook(rows: Record<string, unknown>[], sheetName: string): Buffer {
