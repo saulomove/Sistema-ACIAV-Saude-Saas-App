@@ -82,7 +82,7 @@ export class PortalPacienteController {
   @Patch('me')
   updateMe(
     @Req() req: any,
-    @Body() body: { fullName?: string; whatsapp?: string; email?: string; birthDate?: string; phone?: string; gender?: string },
+    @Body() body: { fullName?: string; whatsapp?: string; email?: string; birthDate?: string; phone?: string; gender?: string; zipCode?: string; address?: string; addressNumber?: string; neighborhood?: string; city?: string; state?: string },
   ) {
     this.ensurePatient(req);
     return this.service.updateMe(this.buildActor(req), {
@@ -92,6 +92,12 @@ export class PortalPacienteController {
       birthDate: body.birthDate,
       phone: body.phone,
       gender: body.gender,
+      zipCode: body.zipCode,
+      address: body.address,
+      addressNumber: body.addressNumber,
+      neighborhood: body.neighborhood,
+      city: body.city,
+      state: body.state,
     });
   }
 

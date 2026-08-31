@@ -14,6 +14,12 @@ interface MeResponse {
   phone: string | null;
   birthDate: string | null;
   gender: string | null;
+  zipCode: string | null;
+  address: string | null;
+  addressNumber: string | null;
+  neighborhood: string | null;
+  city: string | null;
+  state: string | null;
   photoUrl: string | null;
   company: { corporateName: string } | null;
   settings: {
@@ -50,6 +56,11 @@ function toInputDate(iso: string | null): string {
   return iso.slice(0, 10);
 }
 
+function formatCep(value: string | null | undefined): string {
+  const d = (value ?? '').replace(/\D/g, '').slice(0, 8);
+  return d.length > 5 ? `${d.slice(0, 5)}-${d.slice(5)}` : d;
+}
+
 export default function ConfiguracoesPage() {
   const [me, setMe] = useState<MeResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -65,6 +76,13 @@ export default function ConfiguracoesPage() {
   const [whatsapp, setWhatsapp] = useState('');
   const [email, setEmail] = useState('');
   const [birthDate, setBirthDate] = useState('');
+  const [zipCode, setZipCode] = useState('');
+  const [address, setAddress] = useState('');
+  const [addressNumber, setAddressNumber] = useState('');
+  const [neighborhood, setNeighborhood] = useState('');
+  const [city, setCity] = useState('');
+  const [uf, setUf] = useState('');
+  const [cepLoading, setCepLoading] = useState(false);
 
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -88,6 +106,12 @@ export default function ConfiguracoesPage() {
         setWhatsapp(formatWhats(data.whatsapp));
         setEmail(data.email ?? '');
         setBirthDate(toInputDate(data.birthDate));
+        setZipCode(formatCep(data.zipCode));
+        setAddress(data.address ?? '');
+        setAddressNumber(data.addressNumber ?? '');
+        setNeighborhood(data.neighborhood ?? '');
+        setCity(data.city ?? '');
+        setUf(data.state ?? '');
         setNotifEmail(data.settings.notifications.email);
         setNotifWhats(data.settings.notifications.whatsapp);
         setNotifNewProviders(data.settings.notifications.newProviders);
@@ -106,6 +130,26 @@ export default function ConfiguracoesPage() {
     return () => clearTimeout(t);
   }, [msg]);
 
+  async function lookupCep(rawCep: string) {
+    const cep = rawCep.replace(/\D/g, '');
+    if (cep.length !== 8) return;
+    setCepLoading(true);
+    try {
+      const res = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
+      const data = await res.json();
+      if (data && !data.erro) {
+        if (data.logradouro) setAddress(data.logradouro);
+        if (data.bairro) setNeighborhood(data.bairro);
+        if (data.localidade) setCity(data.localidade);
+        if (data.uf) setUf(data.uf);
+      }
+    } catch {
+      // silencioso — dá pra preencher manualmente
+    } finally {
+      setCepLoading(false);
+    }
+  }
+
   async function handleSaveDados(e: React.FormEvent) {
     e.preventDefault();
     setSavingDados(true);
@@ -116,6 +160,12 @@ export default function ConfiguracoesPage() {
         whatsapp: whatsapp.replace(/\D/g, ''),
         email: email.trim().toLowerCase(),
         birthDate: birthDate || undefined,
+        zipCode: zipCode.replace(/\D/g, ''),
+        address,
+        addressNumber,
+        neighborhood,
+        city,
+        state: uf,
       });
       const refreshed = (await api.get('/portal-paciente/me')) as MeResponse;
       setMe(refreshed);
@@ -369,6 +419,85 @@ export default function ConfiguracoesPage() {
                         onChange={(e) => setBirthDate(e.target.value)}
                         className="w-full pl-11 pr-4 py-3 rounded-xl border border-gray-200 bg-slate-50 text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-primary/20 focus:bg-white transition-all"
                       />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Endereço */}
+                <div className="pt-2">
+                  <p className="text-sm font-black text-slate-800 mb-3">Endereço</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-bold text-slate-700">CEP</label>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          value={zipCode}
+                          onChange={(e) => {
+                            const formatted = formatCep(e.target.value);
+                            setZipCode(formatted);
+                            if (formatted.replace(/\D/g, '').length === 8) lookupCep(formatted);
+                          }}
+                          placeholder="00000-000"
+                          maxLength={9}
+                          className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-slate-50 text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-primary/20 focus:bg-white transition-all"
+                        />
+                        {cepLoading && <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-slate-400">buscando…</span>}
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-bold text-slate-700">Número</label>
+                      <input
+                        type="text"
+                        value={addressNumber}
+                        onChange={(e) => setAddressNumber(e.target.value)}
+                        placeholder="Nº"
+                        className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-slate-50 text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-primary/20 focus:bg-white transition-all"
+                      />
+                    </div>
+                    <div className="space-y-2 sm:col-span-2">
+                      <label className="text-sm font-bold text-slate-700">Logradouro</label>
+                      <input
+                        type="text"
+                        value={address}
+                        onChange={(e) => setAddress(e.target.value)}
+                        placeholder="Rua, avenida…"
+                        className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-slate-50 text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-primary/20 focus:bg-white transition-all"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-bold text-slate-700">Bairro</label>
+                      <input
+                        type="text"
+                        value={neighborhood}
+                        onChange={(e) => setNeighborhood(e.target.value)}
+                        placeholder="Bairro"
+                        className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-slate-50 text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-primary/20 focus:bg-white transition-all"
+                      />
+                    </div>
+                    <div className="grid grid-cols-[1fr_4.5rem] gap-3">
+                      <div className="space-y-2">
+                        <label className="text-sm font-bold text-slate-700">Cidade</label>
+                        <input
+                          type="text"
+                          value={city}
+                          onChange={(e) => setCity(e.target.value)}
+                          placeholder="Cidade"
+                          className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-slate-50 text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-primary/20 focus:bg-white transition-all"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-bold text-slate-700">UF</label>
+                        <input
+                          type="text"
+                          value={uf}
+                          onChange={(e) => setUf(e.target.value.toUpperCase().slice(0, 2))}
+                          placeholder="UF"
+                          maxLength={2}
+                          className="w-full px-2 py-3 rounded-xl border border-gray-200 bg-slate-50 text-slate-800 font-medium text-center focus:outline-none focus:ring-2 focus:ring-primary/20 focus:bg-white transition-all"
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>

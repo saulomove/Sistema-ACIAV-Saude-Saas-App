@@ -388,7 +388,11 @@ export class ExportService {
       const titulares = c.users.filter((u) => u.type === 'titular' && matchesStatus(u));
       for (const t of titulares) {
         if (!t.externalCode) { excludedCount++; continue; }
-        const assoc = [this.codeVal(t.externalCode), t.fullName ?? '', this.numVal(t.cpf), c.address ?? '', c.neighborhood ?? '', cc];
+        // Endereço do associado = do TITULAR (com fallback para o endereço da empresa).
+        const tAddr = [t.address, t.addressNumber].filter((x) => (x ?? '').trim()).join(' ').trim() || (c.address ?? '');
+        const tBairro = (t.neighborhood ?? '').trim() || (c.neighborhood ?? '');
+        const tCc = (t.city ?? '').trim() ? (cityCodes[this.normCity(t.city)] ?? cc) : cc;
+        const assoc = [this.codeVal(t.externalCode), t.fullName ?? '', this.numVal(t.cpf), tAddr, tBairro, tCc];
         rows.push([...emp, ...assoc, 'T', 'OU', this.codeVal(t.externalCode), t.gender || 'N', this.numVal(t.cpf), t.fullName ?? '', this.numVal(t.cpf), '']);
         rowCount++;
         const deps = c.users.filter((u) => u.type === 'dependente' && u.parentId === t.id && matchesStatus(u));

@@ -109,6 +109,12 @@ model User {
   memberSince           DateTime?
   email                 String?
   whatsapp              String?
+  zipCode               String? // CEP (só dígitos)
+  address               String? // logradouro
+  addressNumber         String? // número
+  neighborhood          String? // bairro
+  city                  String?
+  state                 String? // UF
   firstAccessDone       Boolean   @default(false)
   inactivationReason    String?
   inactivatedAt         DateTime?

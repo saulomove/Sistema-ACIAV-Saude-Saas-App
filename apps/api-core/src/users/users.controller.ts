@@ -132,6 +132,12 @@ export class UsersController {
       billingName: body.billingName?.trim() || undefined,
       memberSince: body.memberSince?.trim() || undefined,
       cardTypeOverride: body.cardTypeOverride?.trim() || undefined,
+      zipCode: body.zipCode?.toString().replace(/\D/g, '') || undefined,
+      address: body.address?.trim() || undefined,
+      addressNumber: body.addressNumber?.trim() || undefined,
+      neighborhood: body.neighborhood?.trim() || undefined,
+      city: body.city?.trim() || undefined,
+      state: body.state?.trim()?.toUpperCase() || undefined,
       confirmTransfer: confirmTransfer === 'true' || body.confirmTransfer === true,
     };
     return this.usersService.create(data);
@@ -163,6 +169,12 @@ export class UsersController {
       const v = (body.cardTypeOverride ?? '').toString().trim();
       data.cardTypeOverride = v === '' ? null : v;
     }
+    if (body.zipCode !== undefined) data.zipCode = (body.zipCode ?? '').toString().replace(/\D/g, '');
+    if (body.address !== undefined) data.address = body.address;
+    if (body.addressNumber !== undefined) data.addressNumber = body.addressNumber;
+    if (body.neighborhood !== undefined) data.neighborhood = body.neighborhood;
+    if (body.city !== undefined) data.city = body.city;
+    if (body.state !== undefined) data.state = (body.state ?? '').toString().toUpperCase();
     data.confirmTransfer = confirmTransfer === 'true' || body.confirmTransfer === true;
     return this.usersService.update(id, data as any);
   }

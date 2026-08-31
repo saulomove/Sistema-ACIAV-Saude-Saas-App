@@ -65,6 +65,12 @@ export class UsersService {
     billingName?: string;
     memberSince?: string;
     cardTypeOverride?: string;
+    zipCode?: string;
+    address?: string;
+    addressNumber?: string;
+    neighborhood?: string;
+    city?: string;
+    state?: string;
     confirmTransfer?: boolean;
   }) {
     const birthDate = data.birthDate ? new Date(data.birthDate) : undefined;
@@ -109,6 +115,12 @@ export class UsersService {
           memberSince: memberSince ?? undefined,
           externalCode: data.externalCode || undefined,
           cardTypeOverride: data.cardTypeOverride ?? undefined,
+          zipCode: data.zipCode || undefined,
+          address: data.address || undefined,
+          addressNumber: data.addressNumber || undefined,
+          neighborhood: data.neighborhood || undefined,
+          city: data.city || undefined,
+          state: data.state || undefined,
           status: true,
           inactivationReason: null,
           inactivatedAt: null,
@@ -137,6 +149,12 @@ export class UsersService {
         billingName: data.billingName || undefined,
         memberSince,
         cardTypeOverride: data.cardTypeOverride || undefined,
+        zipCode: data.zipCode || undefined,
+        address: data.address || undefined,
+        addressNumber: data.addressNumber || undefined,
+        neighborhood: data.neighborhood || undefined,
+        city: data.city || undefined,
+        state: data.state || undefined,
       },
     });
 
@@ -173,6 +191,12 @@ export class UsersService {
     birthDate?: string;
     memberSince?: string;
     cardTypeOverride?: string | null;
+    zipCode?: string;
+    address?: string;
+    addressNumber?: string;
+    neighborhood?: string;
+    city?: string;
+    state?: string;
     confirmTransfer?: boolean;
   }) {
     if (data.companyId !== undefined) {
@@ -223,6 +247,12 @@ export class UsersService {
     if (data.birthDate !== undefined) updateData.birthDate = new Date(data.birthDate);
     if (data.memberSince !== undefined) updateData.memberSince = new Date(data.memberSince);
     if (data.cardTypeOverride !== undefined) updateData.cardTypeOverride = data.cardTypeOverride;
+    if (data.zipCode !== undefined) updateData.zipCode = data.zipCode;
+    if (data.address !== undefined) updateData.address = data.address;
+    if (data.addressNumber !== undefined) updateData.addressNumber = data.addressNumber;
+    if (data.neighborhood !== undefined) updateData.neighborhood = data.neighborhood;
+    if (data.city !== undefined) updateData.city = data.city;
+    if (data.state !== undefined) updateData.state = data.state;
     return this.prisma.user.update({ where: { id }, data: updateData });
   }
 

@@ -31,6 +31,12 @@ interface User {
   kinship?: string | null;
   billingName?: string | null;
   memberSince?: string | null;
+  zipCode?: string | null;
+  address?: string | null;
+  addressNumber?: string | null;
+  neighborhood?: string | null;
+  city?: string | null;
+  state?: string | null;
   companyId?: string | null;
   cardTypeOverride?: 'app' | 'physical' | null;
   inactivationReason?: string | null;
@@ -62,8 +68,14 @@ const EMPTY_FORM = {
   fullName: '', cpf: '', type: 'titular', companyId: '', parentId: '',
   externalCode: '', gender: '', birthDate: '', phone: '',
   kinship: '', billingName: '', memberSince: '',
+  zipCode: '', address: '', addressNumber: '', neighborhood: '', city: '', state: '',
   cardTypeOverride: '' as '' | 'app' | 'physical',
 };
+
+function formatCep(value: string) {
+  const d = value.replace(/\D/g, '').slice(0, 8);
+  return d.length > 5 ? `${d.slice(0, 5)}-${d.slice(5)}` : d;
+}
 
 function formatCpf(value: string) {
   const d = value.replace(/\D/g, '').slice(0, 11);
@@ -210,6 +222,7 @@ export default function BeneficiariosClient({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
+  const [cepLoading, setCepLoading] = useState(false);
   const [error, setError] = useState('');
 
   const [drawerUser, setDrawerUser] = useState<User | null>(null);
@@ -326,6 +339,12 @@ export default function BeneficiariosClient({
       kinship: u.kinship ?? '',
       billingName: u.billingName ?? '',
       memberSince: u.memberSince ? u.memberSince.slice(0, 10) : '',
+      zipCode: u.zipCode ? formatCep(u.zipCode) : '',
+      address: u.address ?? '',
+      addressNumber: u.addressNumber ?? '',
+      neighborhood: u.neighborhood ?? '',
+      city: u.city ?? '',
+      state: u.state ?? '',
       cardTypeOverride: (u.cardTypeOverride ?? '') as '' | 'app' | 'physical',
     });
     setError('');
@@ -350,6 +369,29 @@ export default function BeneficiariosClient({
     return { ok: res.ok, status: res.status, data };
   }
 
+  async function lookupCep(rawCep: string) {
+    const cep = rawCep.replace(/\D/g, '');
+    if (cep.length !== 8) return;
+    setCepLoading(true);
+    try {
+      const res = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
+      const data = await res.json();
+      if (data && !data.erro) {
+        setForm((prev) => ({
+          ...prev,
+          address: data.logradouro || prev.address,
+          neighborhood: data.bairro || prev.neighborhood,
+          city: data.localidade || prev.city,
+          state: data.uf || prev.state,
+        }));
+      }
+    } catch {
+      // silencioso — dá pra preencher manualmente
+    } finally {
+      setCepLoading(false);
+    }
+  }
+
   async function handleSave(confirmTransfer = false) {
     if (!form.fullName.trim() || !form.cpf.trim()) {
       setError('Nome e CPF são obrigatórios.');
@@ -369,6 +411,12 @@ export default function BeneficiariosClient({
         memberSince: form.memberSince || undefined,
         companyId: form.companyId || undefined,
         cardTypeOverride: form.cardTypeOverride === '' ? null : form.cardTypeOverride,
+        zipCode: form.zipCode.replace(/\D/g, '') || undefined,
+        address: form.address.trim() || undefined,
+        addressNumber: form.addressNumber.trim() || undefined,
+        neighborhood: form.neighborhood.trim() || undefined,
+        city: form.city.trim() || undefined,
+        state: form.state.trim() || undefined,
       };
 
       if (!editingId) {
@@ -1250,6 +1298,95 @@ export default function BeneficiariosClient({
                 <option value="app">Somente aplicativo</option>
                 <option value="physical">Físico + aplicativo</option>
               </select>
+            </div>
+          </div>
+
+          {/* Section 4: Endereço */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 pb-1 border-b border-gray-100">
+              <div className="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-black">4</div>
+              <h3 className="text-sm font-bold text-slate-700">Endereço</h3>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-1">CEP</label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={form.zipCode}
+                    onChange={(e) => {
+                      const formatted = formatCep(e.target.value);
+                      setForm({ ...form, zipCode: formatted });
+                      if (formatted.replace(/\D/g, '').length === 8) lookupCep(formatted);
+                    }}
+                    className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-slate-50"
+                    placeholder="00000-000"
+                    maxLength={9}
+                  />
+                  {cepLoading && (
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">buscando…</span>
+                  )}
+                </div>
+                <p className="text-xs text-slate-400 mt-1">Preenche o endereço automaticamente.</p>
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-1">Número</label>
+                <input
+                  type="text"
+                  value={form.addressNumber}
+                  onChange={(e) => setForm({ ...form, addressNumber: e.target.value })}
+                  className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-slate-50"
+                  placeholder="Nº"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-bold text-slate-700 mb-1">Logradouro</label>
+              <input
+                type="text"
+                value={form.address}
+                onChange={(e) => setForm({ ...form, address: e.target.value })}
+                className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-slate-50"
+                placeholder="Rua, avenida…"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-1">Bairro</label>
+                <input
+                  type="text"
+                  value={form.neighborhood}
+                  onChange={(e) => setForm({ ...form, neighborhood: e.target.value })}
+                  className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-slate-50"
+                  placeholder="Bairro"
+                />
+              </div>
+              <div className="grid grid-cols-[1fr_4.5rem] gap-2">
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">Cidade</label>
+                  <input
+                    type="text"
+                    value={form.city}
+                    onChange={(e) => setForm({ ...form, city: e.target.value })}
+                    className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-slate-50"
+                    placeholder="Cidade"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">UF</label>
+                  <input
+                    type="text"
+                    value={form.state}
+                    onChange={(e) => setForm({ ...form, state: e.target.value.toUpperCase().slice(0, 2) })}
+                    className="w-full border border-gray-200 rounded-lg px-2 py-2.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-slate-50 text-center"
+                    placeholder="UF"
+                    maxLength={2}
+                  />
+                </div>
+              </div>
             </div>
           </div>
 

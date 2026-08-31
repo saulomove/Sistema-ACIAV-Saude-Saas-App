@@ -170,6 +170,12 @@ export class PortalPacienteService {
         phone: true,
         birthDate: true,
         gender: true,
+        zipCode: true,
+        address: true,
+        addressNumber: true,
+        neighborhood: true,
+        city: true,
+        state: true,
         photoUrl: true,
         settings: true,
         company: { select: { corporateName: true } },
@@ -185,7 +191,10 @@ export class PortalPacienteService {
 
   async updateMe(
     actor: ActorContext,
-    data: { fullName?: string; whatsapp?: string; email?: string; birthDate?: string; phone?: string; gender?: string },
+    data: {
+      fullName?: string; whatsapp?: string; email?: string; birthDate?: string; phone?: string; gender?: string;
+      zipCode?: string; address?: string; addressNumber?: string; neighborhood?: string; city?: string; state?: string;
+    },
   ) {
     const userId = actor.userId;
     if (!userId) throw new ForbiddenException('Sessão sem beneficiário vinculado.');
@@ -231,6 +240,12 @@ export class PortalPacienteService {
       const v = data.gender.trim();
       patch.gender = v || null;
     }
+    if (data.zipCode !== undefined) patch.zipCode = data.zipCode.replace(/\D/g, '') || null;
+    if (data.address !== undefined) patch.address = data.address.trim() || null;
+    if (data.addressNumber !== undefined) patch.addressNumber = data.addressNumber.trim() || null;
+    if (data.neighborhood !== undefined) patch.neighborhood = data.neighborhood.trim() || null;
+    if (data.city !== undefined) patch.city = data.city.trim() || null;
+    if (data.state !== undefined) patch.state = data.state.trim().toUpperCase() || null;
 
     if (Object.keys(patch).length === 0) return { ok: true, unchanged: true };
 
