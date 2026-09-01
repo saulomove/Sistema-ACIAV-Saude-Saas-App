@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import {
-  FileSpreadsheet, Download, Loader2, Save, AlertCircle, CheckCircle2, MapPin, History, Info,
+  FileSpreadsheet, Download, Loader2, AlertCircle, CheckCircle2, History,
 } from 'lucide-react';
 import { api } from '../../../lib/api-client';
 
@@ -11,12 +11,6 @@ interface UnitOption {
   name: string;
   cityName?: string | null;
   state?: string | null;
-}
-
-interface CityRow {
-  name: string;
-  count: number;
-  code: number | null;
 }
 
 interface ExportLogRow {
@@ -59,37 +53,10 @@ export default function ExportacoesClient({ role, units }: { role: string; units
   const [error, setError] = useState('');
   const [msg, setMsg] = useState('');
 
-  const [cities, setCities] = useState<CityRow[]>([]);
-  const [codes, setCodes] = useState<Record<string, string>>({});
-  const [loadingCities, setLoadingCities] = useState(false);
-  const [savingCities, setSavingCities] = useState(false);
-
   const [history, setHistory] = useState<ExportLogRow[]>([]);
 
   const showBody = isSuper ? !!selectedUnitId : true;
   const unitQs = isSuper && selectedUnitId ? `?unitId=${selectedUnitId}` : '';
-
-  const loadCities = useCallback(async () => {
-    if (isSuper && !selectedUnitId) {
-      setCities([]);
-      setCodes({});
-      return;
-    }
-    setLoadingCities(true);
-    try {
-      const data = (await api.get(`/export/financeiro/cities${unitQs}`)) as { cities: CityRow[] };
-      setCities(data.cities ?? []);
-      const initial: Record<string, string> = {};
-      (data.cities ?? []).forEach((c) => {
-        initial[c.name] = c.code != null ? String(c.code) : c.name === 'VIDEIRA' ? '1' : '';
-      });
-      setCodes(initial);
-    } catch {
-      setCities([]);
-    } finally {
-      setLoadingCities(false);
-    }
-  }, [isSuper, selectedUnitId, unitQs]);
 
   const loadHistory = useCallback(async () => {
     if (isSuper && !selectedUnitId) {
@@ -105,9 +72,8 @@ export default function ExportacoesClient({ role, units }: { role: string; units
   }, [isSuper, selectedUnitId, unitQs]);
 
   useEffect(() => {
-    loadCities();
     loadHistory();
-  }, [loadCities, loadHistory]);
+  }, [loadHistory]);
 
   async function downloadFinanceiro() {
     if (busy) return;
@@ -146,30 +112,6 @@ export default function ExportacoesClient({ role, units }: { role: string; units
       setBusy(false);
     }
   }
-
-  async function saveCities() {
-    setError('');
-    setMsg('');
-    setSavingCities(true);
-    try {
-      const codesNum: Record<string, number> = {};
-      for (const [k, v] of Object.entries(codes)) {
-        if (v.trim() !== '' && Number.isFinite(Number(v))) codesNum[k] = Number(v);
-      }
-      await api.put('/export/financeiro/cities', {
-        unitId: isSuper ? selectedUnitId : undefined,
-        codes: codesNum,
-      });
-      setMsg('Códigos de cidade salvos!');
-      loadCities();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Erro ao salvar os códigos.');
-    } finally {
-      setSavingCities(false);
-    }
-  }
-
-  const missingCityCodes = cities.filter((c) => !codes[c.name] || codes[c.name].trim() === '').length;
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
@@ -262,74 +204,6 @@ export default function ExportacoesClient({ role, units }: { role: string; units
               </button>
             </div>
 
-            {missingCityCodes > 0 && (
-              <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-2.5 flex items-start gap-2 text-xs text-amber-800">
-                <Info size={15} className="shrink-0 mt-0.5" />
-                <span>
-                  <strong>{missingCityCodes}</strong> cidade(s) sem código definido — essas linhas sairão com o
-                  campo <em>codCidade</em> em branco. Preencha abaixo em “Códigos de cidade”.
-                </span>
-              </div>
-            )}
-          </div>
-
-          {/* Card: De-para de cidades */}
-          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 space-y-4">
-            <div className="flex items-start gap-3">
-              <div className="w-11 h-11 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
-                <MapPin size={22} />
-              </div>
-              <div>
-                <h2 className="font-bold text-slate-800">Códigos de cidade (de-para)</h2>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Código numérico de cada cidade no sistema financeiro (coluna <em>codCidade</em>). Videira = 1.
-                </p>
-              </div>
-            </div>
-
-            {loadingCities ? (
-              <p className="text-sm text-slate-400 py-4 text-center">Carregando cidades…</p>
-            ) : cities.length === 0 ? (
-              <p className="text-sm text-slate-400 py-4 text-center">Nenhuma cidade encontrada nas empresas desta unidade.</p>
-            ) : (
-              <>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
-                        <th className="px-4 py-2.5 text-left font-semibold">Cidade</th>
-                        <th className="px-4 py-2.5 text-right font-semibold">Empresas</th>
-                        <th className="px-4 py-2.5 text-left font-semibold w-40">Código</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {cities.map((c) => (
-                        <tr key={c.name}>
-                          <td className="px-4 py-2 font-medium text-slate-800">{c.name}</td>
-                          <td className="px-4 py-2 text-right text-slate-500 tabular-nums">{c.count}</td>
-                          <td className="px-4 py-2">
-                            <input
-                              type="number"
-                              value={codes[c.name] ?? ''}
-                              onChange={(e) => setCodes((prev) => ({ ...prev, [c.name]: e.target.value }))}
-                              placeholder="—"
-                              className="w-28 h-9 px-2 rounded-lg border border-slate-200 text-sm"
-                            />
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                <button
-                  onClick={saveCities}
-                  disabled={savingCities}
-                  className="inline-flex items-center justify-center gap-2 bg-primary hover:bg-primary-dark text-white font-bold rounded-lg text-sm px-6 h-10 disabled:opacity-50"
-                >
-                  <Save size={16} /> {savingCities ? 'Salvando…' : 'Salvar códigos'}
-                </button>
-              </>
-            )}
           </div>
 
           {/* Card: Histórico */}

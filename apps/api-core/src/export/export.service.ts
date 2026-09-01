@@ -4,10 +4,12 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
 // Colunas EXATAS exigidas pelo sistema financeiro (ordem e nomes do modelo, com cabeçalhos repetidos).
+// Layout v2 (2026-09-01, devolvido pelo financeiro): codCidade/CODCIDADE viraram CEP/CIDADE/UF
+// (nome da cidade por extenso, ex.: "VIDEIRA"/"SC") e ganhou a coluna final VALOR_PLANO. 25 colunas.
 const FINANCEIRO_HEADER = [
-  'CODIGO_EMPRESA', 'EMPRESA', 'CPF/CNPJ', 'ENDERECO', 'BAIRRO', 'codCidade',
-  'CODIGO_ASSOCIADO', 'ASSOCIADO', 'CPF_TITULAR', 'ENDENRECO_ASSOCIADO', 'BAIRRO', 'CODCIDADE',
-  'TIPO', 'ESTADO_CIVIL', 'CODIGO_DEPENDENTE', 'SEXO', 'CPF_DEPENDENTE', 'DEPENDETE', 'CPF_TITULAR', 'PARENTESCO',
+  'CODIGO_EMPRESA', 'EMPRESA', 'CPF/CNPJ', 'ENDERECO', 'BAIRRO', 'CEP', 'CIDADE', 'UF',
+  'CODIGO_ASSOCIADO', 'ASSOCIADO', 'CPF_TITULAR', 'ENDENRECO_ASSOCIADO', 'BAIRRO', 'CEP', 'CIDADE', 'UF',
+  'TIPO', 'ESTADO_CIVIL', 'CODIGO_DEPENDENTE', 'SEXO', 'CPF_DEPENDENTE', 'DEPENDETE', 'CPF_TITULAR', 'PARENTESCO', 'VALOR_PLANO',
 ];
 
 type ExportFilters = {
@@ -296,6 +298,11 @@ export class ExportService {
     return d ? Number(d) : '';
   }
 
+  /** Só dígitos, como TEXTO (preserva zeros à esquerda — CEP de SP começa com 0). */
+  private digits(s?: string | null): string {
+    return (s ?? '').toString().replace(/\D/g, '');
+  }
+
   /** Código externo: número se for só dígitos, senão o texto original. */
   private codeVal(s?: string | null): number | string {
     const d = (s ?? '').toString().trim();
@@ -359,8 +366,6 @@ export class ExportService {
     const unitId = opts.unitId;
     if (!unitId) throw new ForbiddenException('Selecione uma unidade.');
 
-    const cityCodes = await this.getSavedCityCodes(unitId);
-
     const status = opts.status ?? 'active';
     // O filtro de situação vale para o BENEFICIÁRIO (titular/dependente), não para a empresa —
     // assim "ativos" = todos os beneficiários ativos, independentemente do status da empresa.
@@ -382,8 +387,10 @@ export class ExportService {
 
     for (const c of companies) {
       if (!c.externalCode) continue; // exclui empresas de teste (sem código externo, ex.: ACIAV/Karikal)
-      const cc = cityCodes[this.normCity(c.city)] ?? '';
-      const emp = [this.codeVal(c.externalCode), c.corporateName ?? '', this.numVal(c.cnpj), c.address ?? '', c.neighborhood ?? '', cc];
+      const emp = [
+        this.codeVal(c.externalCode), c.corporateName ?? '', this.numVal(c.cnpj),
+        c.address ?? '', c.neighborhood ?? '', this.digits(c.zipCode), (c.city ?? '').trim(), (c.state ?? '').trim(),
+      ];
 
       const titulares = c.users.filter((u) => u.type === 'titular' && matchesStatus(u));
       for (const t of titulares) {
@@ -391,14 +398,17 @@ export class ExportService {
         // Endereço do associado = do TITULAR (com fallback para o endereço da empresa).
         const tAddr = [t.address, t.addressNumber].filter((x) => (x ?? '').trim()).join(' ').trim() || (c.address ?? '');
         const tBairro = (t.neighborhood ?? '').trim() || (c.neighborhood ?? '');
-        const tCc = (t.city ?? '').trim() ? (cityCodes[this.normCity(t.city)] ?? cc) : cc;
-        const assoc = [this.codeVal(t.externalCode), t.fullName ?? '', this.numVal(t.cpf), tAddr, tBairro, tCc];
-        rows.push([...emp, ...assoc, 'T', 'OU', this.codeVal(t.externalCode), t.gender || 'N', this.numVal(t.cpf), t.fullName ?? '', this.numVal(t.cpf), '']);
+        const tZip = this.digits(t.zipCode) || this.digits(c.zipCode);
+        const tCity = (t.city ?? '').trim() || (c.city ?? '').trim();
+        const tUf = (t.state ?? '').trim() || (c.state ?? '').trim();
+        const assoc = [this.codeVal(t.externalCode), t.fullName ?? '', this.numVal(t.cpf), tAddr, tBairro, tZip, tCity, tUf];
+        // VALOR_PLANO (última coluna) fica vazio até a ACIAV definir os valores dos planos.
+        rows.push([...emp, ...assoc, 'T', 'OU', this.codeVal(t.externalCode), t.gender || 'N', this.numVal(t.cpf), t.fullName ?? '', this.numVal(t.cpf), '', '']);
         rowCount++;
         const deps = c.users.filter((u) => u.type === 'dependente' && u.parentId === t.id && matchesStatus(u));
         for (const d of deps) {
           if (!d.externalCode) { excludedCount++; continue; }
-          rows.push([...emp, ...assoc, 'D', 'OU', this.codeVal(d.externalCode), d.gender || 'N', this.numVal(d.cpf), d.fullName ?? '', this.numVal(t.cpf), d.kinship ?? '']);
+          rows.push([...emp, ...assoc, 'D', 'OU', this.codeVal(d.externalCode), d.gender || 'N', this.numVal(d.cpf), d.fullName ?? '', this.numVal(t.cpf), d.kinship ?? '', '']);
           rowCount++;
         }
       }
