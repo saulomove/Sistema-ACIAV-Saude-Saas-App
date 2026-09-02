@@ -82,6 +82,8 @@ model Company {
   memberSince          DateTime?
   dependentPaymentMode String    @default("titular") // 'titular' | 'empresa'
   defaultCardType      String    @default("app") // 'app' | 'physical'
+  planName             String? // tabela de preço no financeiro (ex.: "44-ACIAV SAUDE - TABELA 2025")
+  planValue            Decimal?  @db.Decimal(10, 2) // valor por usuário (R$)
   status               Boolean   @default(true)
   inactivationReason   String?
   inactivatedAt        DateTime?

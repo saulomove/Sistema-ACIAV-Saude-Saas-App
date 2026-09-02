@@ -50,6 +50,8 @@ export class CompaniesService {
     memberSince?: string;
     dependentPaymentMode?: string;
     defaultCardType?: string;
+    planName?: string;
+    planValue?: number | string;
   }) {
     const memberSince = data.memberSince ? new Date(data.memberSince) : undefined;
 
@@ -70,6 +72,11 @@ export class CompaniesService {
         memberSince,
         dependentPaymentMode: data.dependentPaymentMode || undefined,
         defaultCardType: data.defaultCardType || undefined,
+        planName: data.planName?.trim() || undefined,
+        planValue:
+          data.planValue !== undefined && data.planValue !== '' && Number.isFinite(Number(data.planValue))
+            ? Number(data.planValue)
+            : undefined,
       },
     });
 
@@ -110,6 +117,8 @@ export class CompaniesService {
     status?: boolean;
     dependentPaymentMode?: string;
     defaultCardType?: string;
+    planName?: string | null;
+    planValue?: number | string | null;
   }) {
     const updateData: Record<string, unknown> = {};
     if (data.corporateName !== undefined) updateData.corporateName = data.corporateName;
@@ -137,6 +146,14 @@ export class CompaniesService {
     if (data.defaultCardType !== undefined) {
       const v = (data.defaultCardType || 'app').toLowerCase();
       updateData.defaultCardType = ['app', 'physical'].includes(v) ? v : 'app';
+    }
+    if (data.planName !== undefined) {
+      updateData.planName = (data.planName ?? '').toString().trim() || null;
+    }
+    if (data.planValue !== undefined) {
+      const raw = data.planValue;
+      updateData.planValue =
+        raw === null || raw === '' || !Number.isFinite(Number(raw)) ? null : Number(raw);
     }
 
     return this.prisma.company.update({ where: { id }, data: updateData });

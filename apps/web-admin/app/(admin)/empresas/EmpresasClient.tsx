@@ -30,6 +30,8 @@ interface Company {
   status: boolean;
   dependentPaymentMode?: 'titular' | 'empresa' | null;
   defaultCardType?: 'app' | 'physical' | null;
+  planName?: string | null;
+  planValue?: string | number | null;
   inactivationReason?: string | null;
   inactivatedAt?: string | null;
   _count?: { users: number };
@@ -60,6 +62,7 @@ const EMPTY_FORM = {
   city: '', state: '', phone: '', memberSince: '',
   dependentPaymentMode: 'titular' as 'titular' | 'empresa',
   defaultCardType: 'app' as 'app' | 'physical',
+  planName: '', planValue: '',
 };
 
 const STATES = [
@@ -275,6 +278,8 @@ export default function EmpresasClient({
       memberSince: c.memberSince ? c.memberSince.slice(0, 10) : '',
       dependentPaymentMode: (c.dependentPaymentMode ?? 'titular') as 'titular' | 'empresa',
       defaultCardType: (c.defaultCardType ?? 'app') as 'app' | 'physical',
+      planName: c.planName ?? '',
+      planValue: c.planValue != null ? String(c.planValue) : '',
     });
     setError('');
     setTempPassword(null);
@@ -307,6 +312,9 @@ export default function EmpresasClient({
         memberSince: form.memberSince || undefined,
         dependentPaymentMode: form.dependentPaymentMode,
         defaultCardType: form.defaultCardType,
+        // Enviados sempre (mesmo vazios) para permitir limpar o plano na edição.
+        planName: form.planName.trim(),
+        planValue: form.planValue.trim().replace(',', '.'),
       };
 
       if (editingId) {
@@ -1138,6 +1146,41 @@ export default function EmpresasClient({
                       <option value="app">Somente aplicativo</option>
                       <option value="physical">Físico + aplicativo</option>
                     </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1">Tabela de preço (plano)</label>
+                    <p className="text-xs text-slate-400 mb-1.5">Nome da tabela no financeiro</p>
+                    <input
+                      type="text"
+                      list="planos-conhecidos"
+                      value={form.planName}
+                      onChange={(e) => setForm({ ...form, planName: e.target.value })}
+                      className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-slate-50"
+                      placeholder="ex: 44-ACIAV SAUDE - TABELA 2025"
+                    />
+                    <datalist id="planos-conhecidos">
+                      <option value="11-ACIAV SAUDE - BASICO" />
+                      <option value="44-ACIAV SAUDE - TABELA 2025" />
+                      <option value="12-ACIAV SAUDE - ESPECIAL" />
+                      <option value="40-ANUIDADE ACIAV SAUDE - BASICO" />
+                      <option value="55-ANUIDADE ACIAV SAUDE – TABELA 2025" />
+                      <option value="39-ANUIDADE ACIAV SAUDE - ESPECIAL" />
+                    </datalist>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1">Valor por usuário (R$)</label>
+                    <p className="text-xs text-slate-400 mb-1.5">Sai na coluna VALOR_PLANO da exportação</p>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={form.planValue}
+                      onChange={(e) => setForm({ ...form, planValue: e.target.value.replace(/[^0-9.,]/g, '') })}
+                      className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-slate-50"
+                      placeholder="ex: 6"
+                    />
                   </div>
                 </div>
               </div>

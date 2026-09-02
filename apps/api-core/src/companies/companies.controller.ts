@@ -53,6 +53,8 @@ export class CompaniesController {
       memberSince: body.memberSince,
       dependentPaymentMode: body.dependentPaymentMode,
       defaultCardType: body.defaultCardType,
+      planName: body.planName,
+      planValue: body.planValue,
     };
     return this.companiesService.create(data);
   }
@@ -92,7 +94,7 @@ export class CompaniesController {
     const allowed = [
       'corporateName', 'tradeName', 'adminEmail', 'address', 'neighborhood',
       'zipCode', 'city', 'state', 'phone', 'externalCode', 'memberSince', 'status',
-      'dependentPaymentMode', 'defaultCardType',
+      'dependentPaymentMode', 'defaultCardType', 'planName', 'planValue',
     ];
     for (const key of allowed) {
       if (body[key] !== undefined) data[key] = body[key];

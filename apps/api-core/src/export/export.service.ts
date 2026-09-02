@@ -391,6 +391,8 @@ export class ExportService {
         this.codeVal(c.externalCode), c.corporateName ?? '', this.numVal(c.cnpj),
         c.address ?? '', c.neighborhood ?? '', this.digits(c.zipCode), (c.city ?? '').trim(), (c.state ?? '').trim(),
       ];
+      // VALOR_PLANO = valor por usuário da tabela de preço da empresa (vazio se não definido).
+      const planValue = c.planValue != null ? Number(c.planValue) : '';
 
       const titulares = c.users.filter((u) => u.type === 'titular' && matchesStatus(u));
       for (const t of titulares) {
@@ -402,13 +404,12 @@ export class ExportService {
         const tCity = (t.city ?? '').trim() || (c.city ?? '').trim();
         const tUf = (t.state ?? '').trim() || (c.state ?? '').trim();
         const assoc = [this.codeVal(t.externalCode), t.fullName ?? '', this.numVal(t.cpf), tAddr, tBairro, tZip, tCity, tUf];
-        // VALOR_PLANO (última coluna) fica vazio até a ACIAV definir os valores dos planos.
-        rows.push([...emp, ...assoc, 'T', 'OU', this.codeVal(t.externalCode), t.gender || 'N', this.numVal(t.cpf), t.fullName ?? '', this.numVal(t.cpf), '', '']);
+        rows.push([...emp, ...assoc, 'T', 'OU', this.codeVal(t.externalCode), t.gender || 'N', this.numVal(t.cpf), t.fullName ?? '', this.numVal(t.cpf), '', planValue]);
         rowCount++;
         const deps = c.users.filter((u) => u.type === 'dependente' && u.parentId === t.id && matchesStatus(u));
         for (const d of deps) {
           if (!d.externalCode) { excludedCount++; continue; }
-          rows.push([...emp, ...assoc, 'D', 'OU', this.codeVal(d.externalCode), d.gender || 'N', this.numVal(d.cpf), d.fullName ?? '', this.numVal(t.cpf), d.kinship ?? '', '']);
+          rows.push([...emp, ...assoc, 'D', 'OU', this.codeVal(d.externalCode), d.gender || 'N', this.numVal(d.cpf), d.fullName ?? '', this.numVal(t.cpf), d.kinship ?? '', planValue]);
           rowCount++;
         }
       }
