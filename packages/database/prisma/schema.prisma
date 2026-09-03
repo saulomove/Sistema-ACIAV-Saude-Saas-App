@@ -122,6 +122,7 @@ model User {
   inactivatedAt         DateTime?
   inactivationLockUntil DateTime?
   cardTypeOverride      String? // 'app' | 'physical' — null herda da empresa
+  planValue             Decimal?  @db.Decimal(10, 2) // valor por usuário na cobrança — null herda da empresa
   pointsBalance         Int       @default(0)
   photoUrl              String?
   settings              String? // JSON: { notifications: { email, whatsapp, newProviders } }

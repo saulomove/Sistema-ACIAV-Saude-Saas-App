@@ -435,12 +435,15 @@ export class ExportService {
         const tCity = (t.city ?? '').trim() || (c.city ?? '').trim();
         const tUf = (t.state ?? '').trim() || (c.state ?? '').trim();
         const assoc = [this.codeVal(t.externalCode), t.fullName ?? '', this.numVal(t.cpf), tAddr, tBairro, tZip, tCity, tUf];
-        rows.push([...emp, ...assoc, 'T', 'OU', this.codeVal(t.externalCode), t.gender || 'N', this.numVal(t.cpf), t.fullName ?? '', this.numVal(t.cpf), '', planValue]);
+        // Override por beneficiário: User.planValue sobrepõe o valor da empresa (null herda).
+        const tPlan = t.planValue != null ? Number(t.planValue) : planValue;
+        rows.push([...emp, ...assoc, 'T', 'OU', this.codeVal(t.externalCode), t.gender || 'N', this.numVal(t.cpf), t.fullName ?? '', this.numVal(t.cpf), '', tPlan]);
         rowCount++;
         const deps = c.users.filter((u) => u.type === 'dependente' && u.parentId === t.id && matchesStatus(u));
         for (const d of deps) {
           if (!d.externalCode) { excludedCount++; continue; }
-          rows.push([...emp, ...assoc, 'D', 'OU', this.codeVal(d.externalCode), d.gender || 'N', this.numVal(d.cpf), d.fullName ?? '', this.numVal(t.cpf), d.kinship ?? '', planValue]);
+          const dPlan = d.planValue != null ? Number(d.planValue) : planValue;
+          rows.push([...emp, ...assoc, 'D', 'OU', this.codeVal(d.externalCode), d.gender || 'N', this.numVal(d.cpf), d.fullName ?? '', this.numVal(t.cpf), d.kinship ?? '', dPlan]);
           rowCount++;
         }
       }

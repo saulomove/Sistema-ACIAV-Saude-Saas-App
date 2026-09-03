@@ -39,6 +39,7 @@ interface User {
   state?: string | null;
   companyId?: string | null;
   cardTypeOverride?: 'app' | 'physical' | null;
+  planValue?: string | number | null;
   inactivationReason?: string | null;
   inactivatedAt?: string | null;
   inactivationLockUntil?: string | null;
@@ -70,6 +71,7 @@ const EMPTY_FORM = {
   kinship: '', billingName: '', memberSince: '',
   zipCode: '', address: '', addressNumber: '', neighborhood: '', city: '', state: '',
   cardTypeOverride: '' as '' | 'app' | 'physical',
+  planValue: '',
 };
 
 function formatCep(value: string) {
@@ -346,6 +348,7 @@ export default function BeneficiariosClient({
       city: u.city ?? '',
       state: u.state ?? '',
       cardTypeOverride: (u.cardTypeOverride ?? '') as '' | 'app' | 'physical',
+      planValue: u.planValue != null ? String(u.planValue) : '',
     });
     setError('');
     setModalOpen(true);
@@ -424,6 +427,8 @@ export default function BeneficiariosClient({
         memberSince: form.memberSince || undefined,
         companyId: form.companyId || undefined,
         cardTypeOverride: form.cardTypeOverride === '' ? null : form.cardTypeOverride,
+        // Enviado sempre (mesmo vazio) para permitir limpar o override na edição.
+        planValue: form.planValue.trim().replace(',', '.'),
         zipCode: form.zipCode.replace(/\D/g, '') || undefined,
         address: form.address.trim() || undefined,
         addressNumber: form.addressNumber.trim() || undefined,
@@ -1311,6 +1316,21 @@ export default function BeneficiariosClient({
                 <option value="app">Somente aplicativo</option>
                 <option value="physical">Físico + aplicativo</option>
               </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-bold text-slate-700 mb-1">Valor do plano (R$) — opcional</label>
+              <p className="text-xs text-slate-400 mb-1.5">
+                Sobrepõe o valor da empresa na cobrança (para empresas com beneficiários em planos diferentes). Deixe em branco para herdar.
+              </p>
+              <input
+                type="text"
+                inputMode="decimal"
+                value={form.planValue}
+                onChange={(e) => setForm({ ...form, planValue: e.target.value.replace(/[^0-9.,]/g, '') })}
+                className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-slate-50"
+                placeholder="Herdar da empresa"
+              />
             </div>
           </div>
 

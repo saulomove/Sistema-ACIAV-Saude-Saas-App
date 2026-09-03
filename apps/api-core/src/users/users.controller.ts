@@ -143,6 +143,10 @@ export class UsersController {
     // Obrigatórios da cobrança (decisão ACIAV 2026-09-02). O RH não conhece o código
     // do financeiro — só admins são obrigados a informá-lo (a ACIAV completa depois).
     const isAdmin = ['super_admin', 'admin_unit'].includes(req.user.role);
+    // Valor de plano por beneficiário: só admin define (é dado de cobrança).
+    if (isAdmin && body.planValue !== undefined && body.planValue !== '') {
+      (data as Record<string, unknown>).planValue = body.planValue;
+    }
     if (isAdmin && !data.externalCode) {
       throw new BadRequestException('Código externo (financeiro) é obrigatório.');
     }
@@ -178,6 +182,9 @@ export class UsersController {
     if (body.cardTypeOverride !== undefined) {
       const v = (body.cardTypeOverride ?? '').toString().trim();
       data.cardTypeOverride = v === '' ? null : v;
+    }
+    if (body.planValue !== undefined && ['super_admin', 'admin_unit'].includes(req.user.role)) {
+      data.planValue = body.planValue;
     }
     if (body.zipCode !== undefined) data.zipCode = (body.zipCode ?? '').toString().replace(/\D/g, '');
     if (body.address !== undefined) data.address = body.address;

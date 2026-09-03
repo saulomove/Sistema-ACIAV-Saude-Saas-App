@@ -71,6 +71,7 @@ export class UsersService {
     neighborhood?: string;
     city?: string;
     state?: string;
+    planValue?: number | string;
     confirmTransfer?: boolean;
   }) {
     const birthDate = data.birthDate ? new Date(data.birthDate) : undefined;
@@ -149,6 +150,10 @@ export class UsersService {
         billingName: data.billingName || undefined,
         memberSince,
         cardTypeOverride: data.cardTypeOverride || undefined,
+        planValue:
+          data.planValue !== undefined && data.planValue !== '' && Number.isFinite(Number(data.planValue))
+            ? Number(data.planValue)
+            : undefined,
         zipCode: data.zipCode || undefined,
         address: data.address || undefined,
         addressNumber: data.addressNumber || undefined,
@@ -191,6 +196,7 @@ export class UsersService {
     birthDate?: string;
     memberSince?: string;
     cardTypeOverride?: string | null;
+    planValue?: number | string | null;
     zipCode?: string;
     address?: string;
     addressNumber?: string;
@@ -247,6 +253,11 @@ export class UsersService {
     if (data.birthDate !== undefined) updateData.birthDate = new Date(data.birthDate);
     if (data.memberSince !== undefined) updateData.memberSince = new Date(data.memberSince);
     if (data.cardTypeOverride !== undefined) updateData.cardTypeOverride = data.cardTypeOverride;
+    if (data.planValue !== undefined) {
+      const raw = data.planValue;
+      updateData.planValue =
+        raw === null || raw === '' || !Number.isFinite(Number(raw)) ? null : Number(raw);
+    }
     if (data.zipCode !== undefined) updateData.zipCode = data.zipCode;
     if (data.address !== undefined) updateData.address = data.address;
     if (data.addressNumber !== undefined) updateData.addressNumber = data.addressNumber;
