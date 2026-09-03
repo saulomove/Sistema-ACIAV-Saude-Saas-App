@@ -397,6 +397,19 @@ export default function BeneficiariosClient({
       setError('Nome e CPF são obrigatórios.');
       return;
     }
+    // Obrigatórios da cobrança (exportação financeiro)
+    if (!form.externalCode.trim()) {
+      setError('Código externo (financeiro) é obrigatório — é ele que casa a cobrança.');
+      return;
+    }
+    if (!form.gender.trim()) {
+      setError('Sexo é obrigatório.');
+      return;
+    }
+    if (form.type === 'dependente' && !form.kinship.trim()) {
+      setError('Parentesco é obrigatório para dependente.');
+      return;
+    }
     setSaving(true);
     setError('');
     try {

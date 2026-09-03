@@ -81,6 +81,9 @@ export class PortalRhService {
     if (fullName.length < 3) throw new BadRequestException('Nome inválido.');
     if (cpfClean.length !== 11) throw new BadRequestException('CPF inválido.');
     if (!data.parentId) throw new BadRequestException('Titular obrigatório.');
+    // Obrigatórios da cobrança (decisão ACIAV 2026-09-02).
+    if (!data.kinship?.trim()) throw new BadRequestException('Parentesco é obrigatório.');
+    if (!data.gender?.trim()) throw new BadRequestException('Sexo é obrigatório.');
 
     const parent = await this.prisma.user.findUnique({
       where: { id: data.parentId },

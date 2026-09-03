@@ -353,6 +353,37 @@ export class ExportService {
     ]);
   }
 
+  /** Pendências que comprometem a exportação de cobrança (para o painel da tela). */
+  async getFinanceiroPending(unitId: string) {
+    const [companies, usersNoCode, usersNoGender] = await Promise.all([
+      this.prisma.company.findMany({
+        where: { unitId, status: true },
+        select: { corporateName: true, externalCode: true, planName: true, planValue: true, zipCode: true, address: true, city: true },
+        orderBy: { corporateName: 'asc' },
+      }),
+      this.prisma.user.findMany({
+        where: { unitId, status: true, OR: [{ externalCode: null }, { externalCode: '' }] },
+        select: { fullName: true },
+        orderBy: { fullName: 'asc' },
+        take: 50,
+      }),
+      this.prisma.user.count({ where: { unitId, status: true, OR: [{ gender: null }, { gender: '' }] } }),
+    ]);
+    const semCodigo = companies.filter((c) => !(c.externalCode ?? '').trim()).map((c) => c.corporateName);
+    const comCodigo = companies.filter((c) => (c.externalCode ?? '').trim());
+    const semPlano = comCodigo.filter((c) => !(c.planName ?? '').trim() || c.planValue == null).map((c) => c.corporateName);
+    const semEndereco = comCodigo
+      .filter((c) => !(c.address ?? '').trim() || !(c.zipCode ?? '').trim() || !(c.city ?? '').trim())
+      .map((c) => c.corporateName);
+    return {
+      empresasSemCodigo: semCodigo,
+      empresasSemPlano: semPlano,
+      empresasSemEndereco: semEndereco,
+      beneficiariosSemCodigo: usersNoCode.map((u) => u.fullName),
+      beneficiariosSemSexo: usersNoGender,
+    };
+  }
+
   /**
    * Gera o arquivo de cobrança no formato exato do modelo financeiro.
    * Denormalizado: por empresa -> por titular -> 1 linha do titular (TIPO=T) + 1 por dependente (TIPO=D).

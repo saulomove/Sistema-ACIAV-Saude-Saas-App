@@ -1,11 +1,36 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 
+// Campos obrigatórios para a cobrança (exportação financeiro) — decisão ACIAV 2026-09-02.
+const REQUIRED_COMPANY_FIELDS: Array<[keyof CompanyRequired, string]> = [
+  ['externalCode', 'Código externo (financeiro) é obrigatório.'],
+  ['address', 'Endereço é obrigatório.'],
+  ['neighborhood', 'Bairro é obrigatório.'],
+  ['zipCode', 'CEP é obrigatório.'],
+  ['city', 'Cidade é obrigatória.'],
+  ['state', 'UF é obrigatória.'],
+  ['planName', 'Tabela de preço (plano) é obrigatória.'],
+];
+type CompanyRequired = {
+  externalCode?: string; address?: string; neighborhood?: string;
+  zipCode?: string; city?: string; state?: string; planName?: string;
+};
+
 @Injectable()
 export class CompaniesService {
   constructor(private prisma: PrismaService) {}
+
+  private assertRequiredCompanyFields(data: CompanyRequired & { planValue?: number | string }) {
+    for (const [key, msg] of REQUIRED_COMPANY_FIELDS) {
+      if (!(data[key] ?? '').toString().trim()) throw new BadRequestException(msg);
+    }
+    const v = Number(data.planValue);
+    if (data.planValue === undefined || data.planValue === '' || !Number.isFinite(v) || v <= 0) {
+      throw new BadRequestException('Valor por usuário do plano é obrigatório (maior que zero).');
+    }
+  }
 
   async findAll(unitId?: string, search?: string) {
     return this.prisma.company.findMany({
@@ -53,6 +78,9 @@ export class CompaniesService {
     planName?: string;
     planValue?: number | string;
   }) {
+    if (!(data.corporateName ?? '').trim()) throw new BadRequestException('Razão social é obrigatória.');
+    if (!(data.cnpj ?? '').replace(/\D/g, '')) throw new BadRequestException('CNPJ é obrigatório.');
+    this.assertRequiredCompanyFields(data);
     const memberSince = data.memberSince ? new Date(data.memberSince) : undefined;
 
     const company = await this.prisma.company.create({
@@ -120,6 +148,20 @@ export class CompaniesService {
     planName?: string | null;
     planValue?: number | string | null;
   }) {
+    // Campos obrigatórios da cobrança não podem ser esvaziados na edição.
+    const noBlank: Array<[unknown, string]> = [
+      [data.externalCode, 'Código externo (financeiro) não pode ficar vazio.'],
+      [data.address, 'Endereço não pode ficar vazio.'],
+      [data.neighborhood, 'Bairro não pode ficar vazio.'],
+      [data.zipCode, 'CEP não pode ficar vazio.'],
+      [data.city, 'Cidade não pode ficar vazia.'],
+      [data.state, 'UF não pode ficar vazia.'],
+      [data.planName, 'Tabela de preço (plano) não pode ficar vazia.'],
+      [data.planValue, 'Valor por usuário do plano não pode ficar vazio.'],
+    ];
+    for (const [val, msg] of noBlank) {
+      if (val !== undefined && !(val ?? '').toString().trim()) throw new BadRequestException(msg);
+    }
     const updateData: Record<string, unknown> = {};
     if (data.corporateName !== undefined) updateData.corporateName = data.corporateName;
     if (data.tradeName !== undefined) updateData.tradeName = data.tradeName;
@@ -200,6 +242,8 @@ export class CompaniesService {
     city?: string;
     state?: string;
     memberSince?: string;
+    planName?: string;
+    planValue?: number | string;
   }>) {
     const results = { created: 0, skipped: 0, errors: [] as string[] };
 
@@ -208,6 +252,12 @@ export class CompaniesService {
         const cnpjClean = c.cnpj.replace(/\D/g, '');
         if (!cnpjClean) {
           results.errors.push(`Empresa "${c.corporateName}": CNPJ vazio`);
+          continue;
+        }
+        try {
+          this.assertRequiredCompanyFields(c);
+        } catch (e) {
+          results.errors.push(`Empresa "${c.corporateName}": ${e instanceof BadRequestException ? (e.getResponse() as any)?.message ?? e.message : 'dados obrigatórios ausentes'}`);
           continue;
         }
 
@@ -233,6 +283,8 @@ export class CompaniesService {
             city: c.city || undefined,
             state: c.state || undefined,
             memberSince,
+            planName: c.planName?.trim() || undefined,
+            planValue: Number.isFinite(Number(c.planValue)) ? Number(c.planValue) : undefined,
           },
         });
 

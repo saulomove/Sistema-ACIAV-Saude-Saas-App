@@ -464,6 +464,10 @@ export class UsersService {
               return;
             }
 
+            // Obrigatórios da cobrança: código externo e sexo (decisão ACIAV 2026-09-02).
+            if (!u.externalCode?.trim()) { results.errors.push(`"${u.fullName}" (CPF ${u.cpf}): sem código externo — linha ignorada`); return; }
+            if (!u.gender?.trim()) { results.errors.push(`"${u.fullName}" (CPF ${u.cpf}): sem sexo — linha ignorada`); return; }
+
             const companyId = u.proponentName ? companyMap.get(u.proponentName.toUpperCase()) : undefined;
             const birthDate = u.birthDate ? new Date(u.birthDate) : undefined;
             const memberSince = u.memberSince ? new Date(u.memberSince) : undefined;
@@ -532,6 +536,11 @@ export class UsersService {
               results.skipped++;
               return;
             }
+
+            // Obrigatórios da cobrança: código externo, sexo e parentesco do dependente.
+            if (!u.externalCode?.trim()) { results.errors.push(`"${u.fullName}" (CPF ${u.cpf}): sem código externo — linha ignorada`); return; }
+            if (!u.gender?.trim()) { results.errors.push(`"${u.fullName}" (CPF ${u.cpf}): sem sexo — linha ignorada`); return; }
+            if (!u.kinship?.trim()) { results.errors.push(`"${u.fullName}" (CPF ${u.cpf}): sem parentesco — linha ignorada`); return; }
 
             const parentId = u.parentExternalCode ? externalCodeToUserId.get(u.parentExternalCode) : undefined;
 

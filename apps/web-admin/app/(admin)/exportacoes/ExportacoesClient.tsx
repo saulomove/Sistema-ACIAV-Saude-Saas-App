@@ -13,6 +13,14 @@ interface UnitOption {
   state?: string | null;
 }
 
+interface PendingInfo {
+  empresasSemCodigo: string[];
+  empresasSemPlano: string[];
+  empresasSemEndereco: string[];
+  beneficiariosSemCodigo: string[];
+  beneficiariosSemSexo: number;
+}
+
 interface ExportLogRow {
   id: string;
   type: string;
@@ -54,9 +62,22 @@ export default function ExportacoesClient({ role, units }: { role: string; units
   const [msg, setMsg] = useState('');
 
   const [history, setHistory] = useState<ExportLogRow[]>([]);
+  const [pending, setPending] = useState<PendingInfo | null>(null);
 
   const showBody = isSuper ? !!selectedUnitId : true;
   const unitQs = isSuper && selectedUnitId ? `?unitId=${selectedUnitId}` : '';
+
+  const loadPending = useCallback(async () => {
+    if (isSuper && !selectedUnitId) {
+      setPending(null);
+      return;
+    }
+    try {
+      setPending((await api.get(`/export/financeiro/pending${unitQs}`)) as PendingInfo | null);
+    } catch {
+      setPending(null);
+    }
+  }, [isSuper, selectedUnitId, unitQs]);
 
   const loadHistory = useCallback(async () => {
     if (isSuper && !selectedUnitId) {
@@ -73,7 +94,8 @@ export default function ExportacoesClient({ role, units }: { role: string; units
 
   useEffect(() => {
     loadHistory();
-  }, [loadHistory]);
+    loadPending();
+  }, [loadHistory, loadPending]);
 
   async function downloadFinanceiro() {
     if (busy) return;
@@ -165,6 +187,68 @@ export default function ExportacoesClient({ role, units }: { role: string; units
               <CheckCircle2 size={16} className="shrink-0" /> {msg}
             </div>
           )}
+
+          {/* Painel de pendências da cobrança */}
+          {pending &&
+            (pending.empresasSemCodigo.length > 0 ||
+              pending.empresasSemPlano.length > 0 ||
+              pending.empresasSemEndereco.length > 0 ||
+              pending.beneficiariosSemCodigo.length > 0 ||
+              pending.beneficiariosSemSexo > 0) && (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-900 space-y-2">
+                <p className="font-bold flex items-center gap-2">
+                  <AlertCircle size={16} /> Pendências que afetam a exportação de cobrança
+                </p>
+                <ul className="space-y-1.5 text-[13px]">
+                  {pending.empresasSemCodigo.length > 0 && (
+                    <li>
+                      <details>
+                        <summary className="cursor-pointer">
+                          <b>{pending.empresasSemCodigo.length}</b> empresa(s) sem código externo — <b>ficam fora do arquivo</b>
+                        </summary>
+                        <p className="mt-1 pl-4 text-amber-800">{pending.empresasSemCodigo.join(' · ')}</p>
+                      </details>
+                    </li>
+                  )}
+                  {pending.empresasSemPlano.length > 0 && (
+                    <li>
+                      <details>
+                        <summary className="cursor-pointer">
+                          <b>{pending.empresasSemPlano.length}</b> empresa(s) sem plano/valor — saem com VALOR_PLANO vazio
+                        </summary>
+                        <p className="mt-1 pl-4 text-amber-800">{pending.empresasSemPlano.join(' · ')}</p>
+                      </details>
+                    </li>
+                  )}
+                  {pending.empresasSemEndereco.length > 0 && (
+                    <li>
+                      <details>
+                        <summary className="cursor-pointer">
+                          <b>{pending.empresasSemEndereco.length}</b> empresa(s) com endereço incompleto (rua/CEP/cidade)
+                        </summary>
+                        <p className="mt-1 pl-4 text-amber-800">{pending.empresasSemEndereco.join(' · ')}</p>
+                      </details>
+                    </li>
+                  )}
+                  {pending.beneficiariosSemCodigo.length > 0 && (
+                    <li>
+                      <details>
+                        <summary className="cursor-pointer">
+                          <b>{pending.beneficiariosSemCodigo.length}</b> beneficiário(s) sem código externo — <b>ficam fora do arquivo</b>
+                        </summary>
+                        <p className="mt-1 pl-4 text-amber-800">{pending.beneficiariosSemCodigo.join(' · ')}</p>
+                      </details>
+                    </li>
+                  )}
+                  {pending.beneficiariosSemSexo > 0 && (
+                    <li>
+                      <b>{pending.beneficiariosSemSexo}</b> beneficiário(s) sem sexo — saem como &quot;N&quot;
+                    </li>
+                  )}
+                </ul>
+                <p className="text-xs text-amber-700">Corrija nos cadastros de Empresas/Beneficiários — a lista atualiza sozinha.</p>
+              </div>
+            )}
 
           {/* Card: Exportação Financeiro (Cobrança) */}
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 space-y-4">

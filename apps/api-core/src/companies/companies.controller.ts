@@ -80,6 +80,8 @@ export class CompaniesController {
       city: c.city,
       state: c.state,
       memberSince: c.memberSince,
+      planName: c.planName,
+      planValue: c.planValue,
     }));
     return this.companiesService.importBatch(companies);
   }

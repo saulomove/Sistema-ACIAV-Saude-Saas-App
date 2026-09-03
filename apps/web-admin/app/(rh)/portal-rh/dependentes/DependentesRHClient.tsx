@@ -86,6 +86,8 @@ export default function DependentesRHClient({ dependentes, titulares }: Props) {
     if (form.fullName.trim().length < 3) return setError('Nome inválido.');
     const cpfDigits = form.cpf.replace(/\D/g, '');
     if (cpfDigits.length !== 11) return setError('CPF deve ter 11 dígitos.');
+    if (!form.kinship.trim()) return setError('Parentesco é obrigatório.');
+    if (!form.gender.trim()) return setError('Sexo é obrigatório.');
 
     setSubmitting(true);
     try {

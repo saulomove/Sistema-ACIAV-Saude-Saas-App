@@ -23,7 +23,7 @@ interface ConflictInfo {
   message: string;
 }
 
-const EMPTY_FORM = { fullName: '', cpf: '' };
+const EMPTY_FORM = { fullName: '', cpf: '', gender: '' };
 
 function formatDatePt(iso: string | null) {
   if (!iso) return '';
@@ -73,6 +73,7 @@ export default function ColaboradoresRHClient({
     const cpfClean = form.cpf.replace(/\D/g, '');
     if (!form.fullName.trim()) { setError('Nome completo é obrigatório.'); return; }
     if (cpfClean.length !== 11) { setError('CPF inválido.'); return; }
+    if (!form.gender) { setError('Sexo é obrigatório.'); return; }
     if (!companyId || !unitId) { setError('Empresa ou unidade não configurada.'); return; }
 
     setSaving(true);
@@ -86,6 +87,7 @@ export default function ColaboradoresRHClient({
           fullName: form.fullName.trim(),
           cpf: cpfClean,
           type: 'titular',
+          gender: form.gender,
           companyId,
           unitId,
         }),
@@ -238,6 +240,20 @@ export default function ColaboradoresRHClient({
               className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-slate-50 font-mono"
               placeholder="000.000.000-00"
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-bold text-slate-700 mb-1.5">Sexo *</label>
+            <select
+              value={form.gender}
+              onChange={(e) => setForm({ ...form, gender: e.target.value })}
+              className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-slate-50"
+            >
+              <option value="">Selecione…</option>
+              <option value="M">Masculino</option>
+              <option value="F">Feminino</option>
+              <option value="N">Não informar</option>
+            </select>
           </div>
 
           {error && (

@@ -260,6 +260,15 @@ export class ExportController {
   }
 
   @SkipThrottle()
+  @Get('financeiro/pending')
+  async getFinanceiroPending(@Req() req: any, @Query('unitId') unitId?: string) {
+    this.assertAdmin(req);
+    const scope = this.unitScope(req, unitId);
+    if (!scope) return null;
+    return this.exportService.getFinanceiroPending(scope);
+  }
+
+  @SkipThrottle()
   @Get('history')
   async exportHistory(@Req() req: any, @Query('unitId') unitId?: string) {
     this.assertAdmin(req);

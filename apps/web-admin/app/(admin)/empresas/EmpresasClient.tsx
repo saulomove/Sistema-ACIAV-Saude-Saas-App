@@ -54,6 +54,8 @@ interface ImportRow {
   city: string;
   state: string;
   memberSince: string;
+  planName: string;
+  planValue: string;
 }
 
 const EMPTY_FORM = {
@@ -116,6 +118,12 @@ const COLUMN_MAP: Record<string, keyof ImportRow> = {
   'estado': 'state',
   'inclusão': 'memberSince',
   'inclusao': 'memberSince',
+  'tabela de preço': 'planName',
+  'tabela de preco': 'planName',
+  'plano': 'planName',
+  'valor por usuário': 'planValue',
+  'valor por usuario': 'planValue',
+  'valor': 'planValue',
 };
 
 function mapExcelRow(row: Record<string, unknown>): ImportRow {
@@ -293,6 +301,24 @@ export default function EmpresasClient({
     }
     if (!editingId && !form.cnpj.trim()) {
       setError('CNPJ é obrigatório.');
+      return;
+    }
+    // Obrigatórios da cobrança (exportação financeiro)
+    const requiredChecks: Array<[string, string]> = [
+      [form.externalCode, 'Código externo (financeiro) é obrigatório.'],
+      [form.address, 'Endereço é obrigatório.'],
+      [form.neighborhood, 'Bairro é obrigatório.'],
+      [form.zipCode, 'CEP é obrigatório.'],
+      [form.city, 'Cidade é obrigatória.'],
+      [form.state, 'UF é obrigatória.'],
+      [form.planName, 'Tabela de preço (plano) é obrigatória.'],
+    ];
+    for (const [v, msg] of requiredChecks) {
+      if (!v.trim()) { setError(msg); return; }
+    }
+    const pv = Number(form.planValue.trim().replace(',', '.'));
+    if (!form.planValue.trim() || !Number.isFinite(pv) || pv <= 0) {
+      setError('Valor por usuário do plano é obrigatório (maior que zero).');
       return;
     }
     setSaving(true);

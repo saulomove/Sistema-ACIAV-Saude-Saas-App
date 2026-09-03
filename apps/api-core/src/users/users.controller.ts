@@ -1,6 +1,6 @@
 import {
   Controller, Get, Post, Put, Delete, Patch,
-  Param, Body, Query, UseGuards, Req, ForbiddenException,
+  Param, Body, Query, UseGuards, Req, ForbiddenException, BadRequestException,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { SkipThrottle, Throttle } from '@nestjs/throttler';
@@ -140,6 +140,16 @@ export class UsersController {
       state: body.state?.trim()?.toUpperCase() || undefined,
       confirmTransfer: confirmTransfer === 'true' || body.confirmTransfer === true,
     };
+    // Obrigatórios da cobrança (decisão ACIAV 2026-09-02). O RH não conhece o código
+    // do financeiro — só admins são obrigados a informá-lo (a ACIAV completa depois).
+    const isAdmin = ['super_admin', 'admin_unit'].includes(req.user.role);
+    if (isAdmin && !data.externalCode) {
+      throw new BadRequestException('Código externo (financeiro) é obrigatório.');
+    }
+    if (!data.gender) throw new BadRequestException('Sexo é obrigatório.');
+    if (data.type === 'dependente' && !data.kinship) {
+      throw new BadRequestException('Parentesco é obrigatório para dependente.');
+    }
     return this.usersService.create(data);
   }
 
@@ -175,6 +185,13 @@ export class UsersController {
     if (body.neighborhood !== undefined) data.neighborhood = body.neighborhood;
     if (body.city !== undefined) data.city = body.city;
     if (body.state !== undefined) data.state = (body.state ?? '').toString().toUpperCase();
+    // Campos da cobrança não podem ser esvaziados na edição.
+    if (body.externalCode !== undefined && !String(body.externalCode ?? '').trim()) {
+      throw new BadRequestException('Código externo (financeiro) não pode ficar vazio.');
+    }
+    if (body.gender !== undefined && !String(body.gender ?? '').trim()) {
+      throw new BadRequestException('Sexo não pode ficar vazio.');
+    }
     data.confirmTransfer = confirmTransfer === 'true' || body.confirmTransfer === true;
     return this.usersService.update(id, data as any);
   }
